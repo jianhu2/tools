@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汇率换算 - 在线工具</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💱</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5; color: #333; min-height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 90px; min-height: 100vh; background: #fff; border-right: 1px solid #e8e8e8;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+        .sidebar-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; color: #666; font-size: 11px; margin-bottom: 4px;
+            transition: all .2s; text-align: center; line-height: 1.3;
+        }
+        .sidebar-item:hover { background: #f5f5f5; color: #333; }
+        .sidebar-item.active { background: #e8f4f0; color: #1a9a6c; }
+        .sidebar-icon {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px; margin-bottom: 4px; background: #f0f2f5;
+        }
+        .sidebar-item.active .sidebar-icon { background: #1a9a6c; }
+        .sidebar-divider { width: 60px; height: 1px; background: #eee; margin: 8px 0; }
+        .sidebar-more { margin-top: auto; }
+        .main-wrap { margin-left: 90px; flex: 1; padding: 20px; max-width: 900px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+        .page-desc { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.6; }
+        .card {
+            background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .input-row {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .amount-input {
+            flex: 0 0 160px; border: 1.5px solid #ddd; border-radius: 8px; padding: 10px 14px;
+            font-size: 20px; font-weight: 700; outline: none; color: #333; transition: border-color .2s;
+            background: #fafafa; text-align: right;
+        }
+        .amount-input:focus { border-color: #1a9a6c; background: #fff; }
+        .base-select {
+            flex: 0 0 auto; border: 1.5px solid #ddd; border-radius: 8px; padding: 10px 12px;
+            font-size: 14px; outline: none; background: #fafafa; color: #333;
+            transition: border-color .2s; cursor: pointer;
+        }
+        .base-select:focus { border-color: #1a9a6c; }
+        .update-time { font-size: 12px; color: #aaa; flex: 1; text-align: right; }
+        .btn-refresh {
+            padding: 10px 18px; background: #1a9a6c; color: white; border: none;
+            border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s;
+        }
+        .btn-refresh:hover { background: #148a5e; }
+        .rates-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px;
+        }
+        .rate-card {
+            background: #f8fffe; border: 1px solid #d4edda; border-radius: 8px;
+            padding: 12px 14px; cursor: pointer; transition: all .15s;
+        }
+        .rate-card:hover { background: #e8f4f0; border-color: #1a9a6c; }
+        .rate-card.base-card { background: #e8f4f0; border-color: #1a9a6c; }
+        .rate-card .cur-code { font-size: 18px; font-weight: 800; color: #1a9a6c; letter-spacing: 1px; }
+        .rate-card .cur-amount { font-size: 20px; font-weight: 700; color: #222; margin: 4px 0; }
+        .rate-card .cur-name { font-size: 11px; color: #888; line-height: 1.4; }
+        .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+        .error-msg { text-align: center; padding: 20px; color: #e53935; font-size: 13px; }
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: rgba(0,0,0,.8); color: white; padding: 10px 22px; border-radius: 20px;
+            font-size: 13px; font-weight: 500; z-index: 9999; pointer-events: none;
+            transition: transform .3s ease; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        @media (max-width: 600px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .rates-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <a class="sidebar-item" href="/">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item" href="/note.html">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+    <a class="sidebar-item" href="/work.html">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+    <a class="sidebar-item active" href="/money.html">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-more">
+        <a class="sidebar-item" href="/more.html">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<div class="main-wrap">
+    <div class="page-title">汇率换算</div>
+    <div class="page-desc">简单的汇率换算工具，汇率非实时数据，仅供参考。点击任意货币卡片可切换基准货币。</div>
+
+    <div class="card">
+        <div class="input-row">
+            <input type="number" class="amount-input" id="amountInput" value="100" min="0" step="any" oninput="recalc()">
+            <select class="base-select" id="baseSelect" onchange="changeBase()">
+                <option value="CNY">CNY 人民币</option>
+                <option value="USD">USD 美元</option>
+                <option value="EUR">EUR 欧元</option>
+                <option value="JPY">JPY 日元</option>
+                <option value="HKD">HKD 港元</option>
+                <option value="GBP">GBP 英镑</option>
+                <option value="TWD">TWD 台币</option>
+            </select>
+            <button class="btn-refresh" onclick="loadRates(true)">刷新汇率</button>
+            <div class="update-time" id="updateTime">加载中...</div>
+        </div>
+        <div id="ratesContainer" class="rates-grid">
+            <div class="loading">正在获取汇率数据...</div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const CURRENCIES = [
+    { code: 'CNY', name: '人民币', country: '中国 ¥', flag: '🇨🇳' },
+    { code: 'TWD', name: '台币', country: '中国台湾 NT$', flag: '🇹🇼' },
+    { code: 'HKD', name: '港元', country: '中国香港 HK$', flag: '🇭🇰' },
+    { code: 'USD', name: '美元', country: '美国 $', flag: '🇺🇸' },
+    { code: 'EUR', name: '欧元', country: '欧盟 €', flag: '🇪🇺' },
+    { code: 'GBP', name: '英镑', country: '英国 £', flag: '🇬🇧' },
+    { code: 'JPY', name: '日元', country: '日本 ¥', flag: '🇯🇵' },
+    { code: 'KRW', name: '韩元', country: '韩国 ₩', flag: '🇰🇷' },
+    { code: 'SGD', name: '新元', country: '新加坡 S$', flag: '🇸🇬' },
+    { code: 'AUD', name: '澳元', country: '澳大利亚 A$', flag: '🇦🇺' },
+    { code: 'CAD', name: '加元', country: '加拿大 C$', flag: '🇨🇦' },
+    { code: 'CHF', name: '法郎', country: '瑞士 Fr', flag: '🇨🇭' },
+    { code: 'RUB', name: '卢布', country: '俄罗斯 ₽', flag: '🇷🇺' },
+    { code: 'INR', name: '卢比', country: '印度 ₹', flag: '🇮🇳' },
+    { code: 'THB', name: '泰铢', country: '泰国 ฿', flag: '🇹🇭' },
+    { code: 'MYR', name: '林吉特', country: '马来西亚 RM', flag: '🇲🇾' },
+    { code: 'VND', name: '越南盾', country: '越南 ₫', flag: '🇻🇳' },
+    { code: 'IDR', name: '印尼盾', country: '印度尼西亚 Rp', flag: '🇮🇩' },
+    { code: 'PHP', name: '比索', country: '菲律宾 ₱', flag: '🇵🇭' },
+    { code: 'TRY', name: '里拉', country: '土耳其 ₺', flag: '🇹🇷' },
+    { code: 'MXN', name: '比索', country: '墨西哥 $', flag: '🇲🇽' },
+    { code: 'ARS', name: '比索', country: '阿根廷 $', flag: '🇦🇷' },
+    { code: 'SAR', name: '里亚尔', country: '沙特阿拉伯 SR', flag: '🇸🇦' },
+    { code: 'PKR', name: '卢比', country: '巴基斯坦 ₨', flag: '🇵🇰' },
+    { code: 'BDT', name: '塔卡', country: '孟加拉国 ৳', flag: '🇧🇩' },
+];
+
+let rates = {}; // all rates in CNY base
+let baseCurrency = 'CNY';
+
+function showToast(msg, duration = 2500) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+let fetching = false;
+
+// Try primary API, fall back to secondary
+async function fetchFromAPI() {
+    const apis = [
+        {
+            url: 'https://open.er-api.com/v6/latest/CNY',
+            parse: d => ({
+                rates: d.rates,
+                updateTime: new Date(d.time_last_update_utc).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+                nextUpdate: new Date(d.time_next_update_utc).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+            }),
+            check: d => d.result === 'success',
+        },
+        {
+            url: 'https://api.exchangerate-api.com/v4/latest/CNY',
+            parse: d => ({
+                rates: d.rates,
+                updateTime: new Date(d.date).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'}),
+                nextUpdate: null,
+            }),
+            check: d => !!d.rates,
+        },
+    ];
+    for (const api of apis) {
+        try {
+            const res = await fetch(api.url, { cache: 'no-store' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (!api.check(data)) throw new Error('数据格式异常');
+            return api.parse(data);
+        } catch (e) {
+            console.warn('API failed:', api.url, e.message);
+        }
+    }
+    throw new Error('所有汇率接口均不可用');
+}
+
+async function loadRates(forceRefresh = false) {
+    if (fetching) return;
+    fetching = true;
+
+    const btn = document.querySelector('.btn-refresh');
+    btn.textContent = '获取中...';
+    btn.disabled = true;
+    document.getElementById('updateTime').textContent = '正在获取最新汇率...';
+
+    // Show cached data immediately while fetching
+    if (!forceRefresh) {
+        const cached = localStorage.getItem('money_rates');
+        if (cached) {
+            try {
+                const c = JSON.parse(cached);
+                rates = c.rates;
+                document.getElementById('updateTime').textContent = '加载中（显示缓存）：' + c.updateTime;
+                renderRates();
+            } catch(e) {}
+        }
+    } else {
+        // Clear display so user sees loading state on manual refresh
+        document.getElementById('ratesContainer').innerHTML = '<div class="loading">正在获取最新汇率数据...</div>';
+    }
+
+    try {
+        const result = await fetchFromAPI();
+        rates = result.rates;
+        let timeText = '数据更新时间：' + result.updateTime;
+        if (result.nextUpdate) timeText += '　下次更新：' + result.nextUpdate;
+        document.getElementById('updateTime').textContent = timeText;
+        renderRates();
+        localStorage.setItem('money_rates', JSON.stringify({
+            rates: result.rates,
+            ts: Date.now(),
+            updateTime: result.updateTime,
+        }));
+        if (forceRefresh) showToast('汇率已更新');
+    } catch(e) {
+        const cached = localStorage.getItem('money_rates');
+        if (cached) {
+            try {
+                const c = JSON.parse(cached);
+                rates = c.rates;
+                document.getElementById('updateTime').textContent = '⚠️ 网络请求失败，显示缓存数据：' + c.updateTime;
+                renderRates();
+            } catch(_) {}
+        } else {
+            document.getElementById('ratesContainer').innerHTML =
+                `<div class="error-msg">汇率获取失败：${e.message}<br>请检查网络连接后重试。</div>`;
+            document.getElementById('updateTime').textContent = '获取失败';
+        }
+        if (forceRefresh) showToast('⚠️ 获取失败：' + e.message);
+    } finally {
+        fetching = false;
+        btn.textContent = '刷新汇率';
+        btn.disabled = false;
+    }
+}
+
+function getAmount() {
+    return parseFloat(document.getElementById('amountInput').value) || 100;
+}
+
+function renderRates() {
+    const amount = getAmount();
+    const base = baseCurrency;
+    const baseInCNY = rates[base] || 1;
+    const container = document.getElementById('ratesContainer');
+    container.innerHTML = '';
+
+    CURRENCIES.forEach(cur => {
+        if (!rates[cur.code]) return;
+        const converted = (amount / baseInCNY) * rates[cur.code];
+        const isBase = cur.code === base;
+        const card = document.createElement('div');
+        card.className = 'rate-card' + (isBase ? ' base-card' : '');
+        card.innerHTML = `
+            <div class="cur-code">${cur.flag} ${cur.code}</div>
+            <div class="cur-amount">${formatAmount(converted, cur.code)}</div>
+            <div class="cur-name">${cur.name}（${cur.country}）</div>
+        `;
+        card.onclick = () => {
+            baseCurrency = cur.code;
+            document.getElementById('baseSelect').value = cur.code;
+            renderRates();
+        };
+        container.appendChild(card);
+    });
+}
+
+function formatAmount(val, code) {
+    if (['JPY', 'KRW', 'VND', 'IDR', 'PKR', 'BDT'].includes(code)) {
+        return val.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    return val.toFixed(4).replace(/\.?0+$/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function recalc() { if (Object.keys(rates).length) renderRates(); }
+
+function changeBase() {
+    baseCurrency = document.getElementById('baseSelect').value;
+    if (Object.keys(rates).length) renderRates();
+}
+
+// Always fetch fresh on load; refresh button forces re-fetch
+loadRates(false);
+</script>
+</body>
+</html>

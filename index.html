@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2FA工具 - 在线双重验证码生成器</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            width: 90px;
+            min-height: 100vh;
+            background: #fff;
+            border-right: 1px solid #e8e8e8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            z-index: 100;
+            box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+
+        .sidebar-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            padding: 10px 4px;
+            border-radius: 10px;
+            cursor: pointer;
+            text-decoration: none;
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 4px;
+            transition: all .2s;
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        .sidebar-item:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .sidebar-item.active {
+            background: #e8f4f0;
+            color: #1a9a6c;
+        }
+
+        .sidebar-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 4px;
+            background: #f0f2f5;
+        }
+
+        .sidebar-item.active .sidebar-icon {
+            background: #1a9a6c;
+        }
+
+        .sidebar-divider {
+            width: 60px;
+            height: 1px;
+            background: #eee;
+            margin: 8px 0;
+        }
+
+        .sidebar-more {
+            margin-top: auto;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .main-wrap {
+            margin-left: 90px;
+            flex: 1;
+            padding: 20px;
+            max-width: 900px;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 4px;
+        }
+
+        .page-desc {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 18px;
+            line-height: 1.6;
+        }
+
+        /* ===== CARD ===== */
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .card-tag {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #fff;
+        }
+
+        .tag-js { background: #f7a23e; }
+        .tag-php { background: #7c5cfc; }
+
+        .card-title-text {
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* ===== INPUT AREA ===== */
+        .input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .secret-input {
+            flex: 1;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            outline: none;
+            font-family: 'Courier New', monospace;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            color: #333;
+            transition: border-color .2s;
+            background: #fafafa;
+        }
+
+        .secret-input:focus {
+            border-color: #1a9a6c;
+            background: #fff;
+        }
+
+        .secret-input::placeholder { text-transform: none; color: #bbb; }
+
+        .btn-get {
+            padding: 10px 18px;
+            background: #1a9a6c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .15s;
+        }
+
+        .btn-get:hover { background: #148a5e; }
+
+        /* ===== RESULT AREA ===== */
+        .result-area {
+            background: #f8fffe;
+            border: 1px solid #d4edda;
+            border-radius: 8px;
+            padding: 14px 16px;
+            display: none;
+        }
+
+        .result-area.show { display: block; }
+
+        .result-row {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .result-label { min-width: 80px; color: #888; }
+
+        .result-secret {
+            font-family: monospace;
+            font-size: 13px;
+            color: #333;
+            word-break: break-all;
+        }
+
+        .result-code {
+            font-size: 28px;
+            font-weight: 800;
+            color: #1a9a6c;
+            letter-spacing: 5px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: background .15s;
+        }
+
+        .result-code:hover { background: #e8f4f0; }
+
+        .result-time {
+            font-size: 13px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .countdown-bar {
+            flex: 1;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            max-width: 120px;
+        }
+
+        .countdown-fill {
+            height: 100%;
+            border-radius: 2px;
+            background: #1a9a6c;
+            transition: width .5s linear, background .3s;
+        }
+
+        .countdown-sec {
+            font-weight: 700;
+            color: #1a9a6c;
+            min-width: 50px;
+        }
+
+        .countdown-sec.warn { color: #f7a23e; }
+        .countdown-sec.danger { color: #e53935; }
+
+        .btn-qr {
+            float: right;
+            padding: 6px 14px;
+            background: transparent;
+            border: 1.5px solid #1a9a6c;
+            color: #1a9a6c;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .15s;
+        }
+
+        .btn-qr:hover { background: #1a9a6c; color: #fff; }
+
+        /* ===== KEY HISTORY ===== */
+        .history-textarea {
+            width: 100%;
+            min-height: 100px;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            color: #444;
+            resize: vertical;
+            outline: none;
+            line-height: 1.6;
+            transition: border-color .2s;
+        }
+
+        .history-textarea:focus { border-color: #1a9a6c; }
+
+        .history-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .history-tip {
+            font-size: 12px;
+            color: #aaa;
+            line-height: 1.5;
+        }
+
+        .btn-clear {
+            padding: 6px 14px;
+            background: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .15s;
+            flex-shrink: 0;
+        }
+
+        .btn-clear:hover { background: #d9363e; }
+
+        /* ===== INFO CARD ===== */
+        .info-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+
+        .info-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #1a9a6c;
+            display: inline-block;
+        }
+
+        .info-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .info-list li {
+            font-size: 13px;
+            color: #555;
+            line-height: 1.8;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .info-list li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: #1a9a6c;
+        }
+
+        .demo-key {
+            color: #1a9a6c;
+            cursor: pointer;
+            text-decoration: underline;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        .demo-key:hover { color: #148a5e; }
+
+        /* ===== QR MODAL ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal-box {
+            background: white;
+            border-radius: 12px;
+            padding: 28px 24px 20px;
+            width: min(360px, 90vw);
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        }
+
+        .modal-box h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .modal-box p {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 16px;
+        }
+
+        #qrcode-container {
+            display: inline-block;
+            padding: 12px;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .modal-close {
+            padding: 8px 24px;
+            background: #1a9a6c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .modal-close:hover { background: #148a5e; }
+
+        /* ===== TOAST ===== */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: rgba(0,0,0,.8);
+            color: white;
+            padding: 10px 22px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 9999;
+            pointer-events: none;
+            transition: transform .3s ease;
+            white-space: nowrap;
+        }
+
+        #toast.show { transform: translateX(-50%) translateY(0); }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 600px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .input-group { flex-direction: column; }
+            .result-code { font-size: 22px; letter-spacing: 4px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== SIDEBAR ===== -->
+<nav class="sidebar">
+    <a class="sidebar-item active" href="/">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+
+    <div class="sidebar-divider"></div>
+
+    <a class="sidebar-item" href="/note.html" title="文本处理">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+
+    <a class="sidebar-item" href="/work.html" title="图片处理">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+
+    <a class="sidebar-item" href="/money.html" title="汇率换算">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-more">
+        <a class="sidebar-item" href="/more.html" title="更多工具">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<!-- ===== MAIN CONTENT ===== -->
+<div class="main-wrap">
+    <div class="page-title">2FA验证</div>
+    <div class="page-desc">双重验证码/二步验证码获取工具（相当于谷歌身份验证器的网页版），使用时任选1种方式输入密钥获取即可。</div>
+
+    <!-- JS 实现 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-tag tag-js">JS</span>
+            <span class="card-title-text">JS实现</span>
+        </div>
+
+        <div class="input-group">
+            <input class="secret-input" id="jsSecretInput"
+                   placeholder="点击此处输入密钥"
+                   autocomplete="off" spellcheck="false">
+            <button class="btn-get" onclick="jsGenerate()">点击获取验证码</button>
+        </div>
+
+        <div class="result-area" id="jsResult">
+            <div class="result-row">
+                <span class="result-label">双重密钥为:</span>
+                <span class="result-secret" id="jsSecretDisplay"></span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">当前验证码:</span>
+                <span class="result-code" id="jsCode" title="点击复制" onclick="copyCode('jsCode')">------</span>
+                <button class="btn-qr" onclick="showQR('js')">生成二维码</button>
+            </div>
+            <div class="result-row">
+                <span class="result-label">剩余的时间:</span>
+                <span class="result-time">
+                    <span class="countdown-sec" id="jsSec">30</span> 秒
+                    <div class="countdown-bar"><div class="countdown-fill" id="jsBar"></div></div>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHP 实现 (前端模拟) -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-tag tag-php">PHP</span>
+            <span class="card-title-text">PHP实现</span>
+        </div>
+
+        <div class="input-group">
+            <input class="secret-input" id="phpSecretInput"
+                   placeholder="点击此处输入密钥"
+                   autocomplete="off" spellcheck="false">
+            <button class="btn-get" onclick="phpGenerate()">点击获取验证码</button>
+        </div>
+
+        <div class="result-area" id="phpResult">
+            <div class="result-row">
+                <span class="result-label">双重密钥为:</span>
+                <span class="result-secret" id="phpSecretDisplay"></span>
+            </div>
+            <div class="result-row">
+                <span class="result-label">当前验证码:</span>
+                <span class="result-code" id="phpCode" title="点击复制" onclick="copyCode('phpCode')">------</span>
+                <button class="btn-qr" onclick="showQR('php')">生成二维码</button>
+            </div>
+            <div class="result-row">
+                <span class="result-label">剩余的时间:</span>
+                <span class="result-time">
+                    <span class="countdown-sec" id="phpSec">30</span> 秒
+                    <div class="countdown-bar"><div class="countdown-fill" id="phpBar"></div></div>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 密钥历史记录 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title-text">密钥历史记录</span>
+        </div>
+        <textarea class="history-textarea" id="historyArea"
+            placeholder="这里记录了获取过验证码的2FA密钥，你也可以备注任何信息到此处。&#10;点击某一行密钥可快速使用。"></textarea>
+        <div class="history-footer">
+            <span class="history-tip">
+                本区域内容保存在浏览器缓存中，清除浏览器数据或点击右侧清除按钮将丢失内容，请谨慎操作。
+            </span>
+            <button class="btn-clear" onclick="clearHistory()">清除此次记录的2FA密钥</button>
+        </div>
+    </div>
+
+    <!-- 说明 -->
+    <div class="info-card">
+        <div class="info-title">2FA工具说明</div>
+        <ul class="info-list">
+            <li>
+                演示密钥：<span class="demo-key" onclick="useDemo()" id="demoKey">7J64V3P3E77J3LKNUGSZ5QANTLRLTKVL</span>（点击此密钥可复制）
+            </li>
+            <li>新手提示：必须在倒计时结束前输入验证码登录或验证，否则会失效显示错误。</li>
+            <li>测试功能时必须输入正确编码的密钥，不要随便输入一串字符测试获取功能。</li>
+            <li>目前点击获取验证码的按钮后会自动复制验证码到剪切板，直接去粘贴即可。</li>
+            <li>如果想要验证生成的验证码是否正确，点击生成二维码的按钮，使用谷歌验证器APP扫描添加检查。</li>
+            <li>
+                更多方式：还可以将密钥加在网址后面，示例：
+                <span class="demo-key" onclick="copyText('https://tools.jianhu.cc/2fa/7J64V3P3E77J3LKNUGSZ5QANTLRLTKVL')">
+                    https://tools.jianhu.cc/2fa/7J64V3P3E77J3LKNUGSZ5QANTLRLTKVL
+                </span>
+                ，这样访问也可查询验证码。
+            </li>
+        </ul>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#bbb;padding:10px 0 20px">
+        最近维护：2026年5月 &nbsp;·&nbsp; © 2026 tools.jianhu.cc
+    </div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal-overlay" id="qrModal">
+    <div class="modal-box">
+        <h3>扫描添加到验证器</h3>
+        <p>使用 Google Authenticator 或其他 TOTP App 扫描二维码</p>
+        <div id="qrcode-container"></div>
+        <br>
+        <button class="modal-close" onclick="closeQR()">关闭</button>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// TOTP Core Algorithm
+// ============================================================
+
+function base32ToBytes(base32) {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    const str = base32.toUpperCase().replace(/\s+/g, '').replace(/=+$/g, '');
+    let bits = 0, value = 0;
+    const out = [];
+    for (let i = 0; i < str.length; i++) {
+        const idx = alphabet.indexOf(str[i]);
+        if (idx < 0) throw new Error('无效字符: ' + str[i]);
+        value = (value << 5) | idx;
+        bits += 5;
+        if (bits >= 8) { out.push((value >>> (bits - 8)) & 0xff); bits -= 8; }
+    }
+    return new Uint8Array(out);
+}
+
+async function generateTOTP(secret) {
+    const key = base32ToBytes(secret);
+    const epoch = Math.floor(Date.now() / 1000);
+    const counter = Math.floor(epoch / 30);
+    const buf = new ArrayBuffer(8);
+    const view = new DataView(buf);
+    view.setUint32(0, Math.floor(counter / 0x100000000), false);
+    view.setUint32(4, counter >>> 0, false);
+    const cryptoKey = await crypto.subtle.importKey(
+        'raw', key, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', cryptoKey, buf);
+    const hash = new Uint8Array(sig);
+    const offset = hash[hash.length - 1] & 0x0f;
+    const code = ((hash[offset] & 0x7f) << 24)
+               | (hash[offset + 1] << 16)
+               | (hash[offset + 2] << 8)
+               |  hash[offset + 3];
+    return String(code % 1000000).padStart(6, '0');
+}
+
+function getRemaining() {
+    return 30 - (Math.floor(Date.now() / 1000) % 30);
+}
+
+// ============================================================
+// State
+// ============================================================
+
+let jsSecret = '';
+let phpSecret = '';
+let timerInterval = null;
+
+// ============================================================
+// Generate handlers
+// ============================================================
+
+async function jsGenerate() {
+    const raw = document.getElementById('jsSecretInput').value.trim();
+    if (!raw) { toast('请先输入密钥'); return; }
+    await activateJS(raw);
+}
+
+async function phpGenerate() {
+    const raw = document.getElementById('phpSecretInput').value.trim();
+    if (!raw) { toast('请先输入密钥'); return; }
+    await activatePHP(raw);
+}
+
+async function activateJS(secret) {
+    secret = secret.toUpperCase().replace(/\s+/g, '');
+    try {
+        const code = await generateTOTP(secret);
+        jsSecret = secret;
+        document.getElementById('jsSecretInput').value = secret;
+        document.getElementById('jsSecretDisplay').textContent = secret;
+        document.getElementById('jsCode').textContent = code;
+        document.getElementById('jsResult').classList.add('show');
+        addHistory(secret);
+        await copyToClipboard(code);
+        toast('验证码已复制: ' + code);
+        startTimer();
+    } catch(e) { toast('密钥格式错误: ' + e.message); }
+}
+
+async function activatePHP(secret) {
+    secret = secret.toUpperCase().replace(/\s+/g, '');
+    try {
+        const code = await generateTOTP(secret);
+        phpSecret = secret;
+        document.getElementById('phpSecretInput').value = secret;
+        document.getElementById('phpSecretDisplay').textContent = secret;
+        document.getElementById('phpCode').textContent = code;
+        document.getElementById('phpResult').classList.add('show');
+        addHistory(secret);
+        await copyToClipboard(code);
+        toast('验证码已复制: ' + code);
+        startTimer();
+    } catch(e) { toast('密钥格式错误: ' + e.message); }
+}
+
+// ============================================================
+// Timer / Countdown
+// ============================================================
+
+function startTimer() {
+    if (timerInterval) return;  // already running
+    timerInterval = setInterval(tick, 500);
+    tick();
+}
+
+async function tick() {
+    const rem = getRemaining();
+    const pct = (rem / 30) * 100;
+
+    // Update JS section
+    if (jsSecret) {
+        const secEl = document.getElementById('jsSec');
+        const barEl = document.getElementById('jsBar');
+        secEl.textContent = rem;
+        secEl.className = 'countdown-sec' + (rem <= 5 ? ' danger' : rem <= 10 ? ' warn' : '');
+        barEl.style.width = pct + '%';
+        barEl.style.background = rem <= 5 ? '#e53935' : rem <= 10 ? '#f7a23e' : '#1a9a6c';
+
+        if (rem === 30) {
+            try {
+                const code = await generateTOTP(jsSecret);
+                document.getElementById('jsCode').textContent = code;
+            } catch {}
+        }
+    }
+
+    // Update PHP section
+    if (phpSecret) {
+        const secEl = document.getElementById('phpSec');
+        const barEl = document.getElementById('phpBar');
+        secEl.textContent = rem;
+        secEl.className = 'countdown-sec' + (rem <= 5 ? ' danger' : rem <= 10 ? ' warn' : '');
+        barEl.style.width = pct + '%';
+        barEl.style.background = rem <= 5 ? '#e53935' : rem <= 10 ? '#f7a23e' : '#1a9a6c';
+
+        if (rem === 30) {
+            try {
+                const code = await generateTOTP(phpSecret);
+                document.getElementById('phpCode').textContent = code;
+            } catch {}
+        }
+    }
+}
+
+// ============================================================
+// Copy
+// ============================================================
+
+async function copyCode(elId) {
+    const text = document.getElementById(elId).textContent;
+    if (text === '------') return;
+    await copyToClipboard(text);
+    toast('已复制: ' + text);
+}
+
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch {
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+    }
+}
+
+function copyText(text) {
+    copyToClipboard(text);
+    toast('链接已复制');
+}
+
+// ============================================================
+// History (localStorage)
+// ============================================================
+
+const STORAGE_KEY = '2fa_history';
+
+function loadHistory() {
+    const saved = localStorage.getItem(STORAGE_KEY) || '';
+    document.getElementById('historyArea').value = saved;
+}
+
+function addHistory(secret) {
+    const today = new Date();
+    const dateStr = today.getFullYear() + '.' + String(today.getMonth()+1).padStart(2,'0') + '.' + String(today.getDate()).padStart(2,'0');
+    const entry = dateStr + ' - ' + secret;
+
+    const ta = document.getElementById('historyArea');
+    const lines = ta.value ? ta.value.split('\n').filter(l => l.trim()) : [];
+
+    // avoid duplicate
+    if (lines.some(l => l.includes(secret))) {
+        saveHistory();
+        return;
+    }
+
+    lines.unshift(entry);
+    ta.value = lines.join('\n');
+    saveHistory();
+}
+
+function saveHistory() {
+    localStorage.setItem(STORAGE_KEY, document.getElementById('historyArea').value);
+}
+
+function clearHistory() {
+    if (!confirm('确认清除所有已记录的2FA密钥？此操作不可恢复。')) return;
+    document.getElementById('historyArea').value = '';
+    localStorage.removeItem(STORAGE_KEY);
+    toast('已清除记录');
+}
+
+// clicking a line in history auto-fills JS input
+document.getElementById('historyArea').addEventListener('click', function() {
+    const lines = this.value.split('\n');
+    const pos = this.selectionStart;
+    let total = 0;
+    for (const line of lines) {
+        total += line.length + 1;
+        if (pos < total) {
+            const m = line.match(/[A-Z2-7]{16,}/i);
+            if (m) {
+                const secret = m[0].toUpperCase();
+                document.getElementById('jsSecretInput').value = secret;
+                activateJS(secret);
+            }
+            break;
+        }
+    }
+});
+
+document.getElementById('historyArea').addEventListener('input', saveHistory);
+
+// ============================================================
+// Demo Key
+// ============================================================
+
+function useDemo() {
+    const demo = '7J64V3P3E77J3LKNUGSZ5QANTLRLTKVL';
+    copyToClipboard(demo);
+    document.getElementById('jsSecretInput').value = demo;
+    activateJS(demo);
+}
+
+// ============================================================
+// QR Code
+// ============================================================
+
+let qrInstance = null;
+
+function showQR(type) {
+    const secret = type === 'js' ? jsSecret : phpSecret;
+    if (!secret) { toast('请先获取验证码'); return; }
+    const uri = 'otpauth://totp/2FA%20Tool?secret=' + secret + '&issuer=tools.jianhu.cc';
+    const container = document.getElementById('qrcode-container');
+    container.innerHTML = '';
+    qrInstance = new QRCode(container, {
+        text: uri,
+        width: 200,
+        height: 200,
+        colorDark: '#1a1a1a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+    });
+    document.getElementById('qrModal').classList.add('open');
+}
+
+function closeQR() {
+    document.getElementById('qrModal').classList.remove('open');
+}
+
+document.getElementById('qrModal').addEventListener('click', function(e) {
+    if (e.target === this) closeQR();
+});
+
+// ============================================================
+// Toast
+// ============================================================
+
+let toastTimer = null;
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ============================================================
+// URL Routing: /2fa/SECRET
+// ============================================================
+
+function handleURLSecret() {
+    const path = window.location.pathname;
+    const m = path.match(/\/2fa\/([A-Z2-7]{10,})/i);
+    if (m) {
+        const secret = m[1].toUpperCase();
+        document.getElementById('jsSecretInput').value = secret;
+        activateJS(secret);
+    }
+}
+
+// ============================================================
+// Enter key support
+// ============================================================
+
+document.getElementById('jsSecretInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') jsGenerate();
+});
+document.getElementById('phpSecretInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') phpGenerate();
+});
+
+// ============================================================
+// Init
+// ============================================================
+
+loadHistory();
+handleURLSecret();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>更多工具 - 在线工具</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5; color: #333; min-height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 90px; min-height: 100vh; background: #fff; border-right: 1px solid #e8e8e8;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+        .sidebar-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; color: #666; font-size: 11px; margin-bottom: 4px;
+            transition: all .2s; text-align: center; line-height: 1.3;
+        }
+        .sidebar-item:hover { background: #f5f5f5; color: #333; }
+        .sidebar-item.active { background: #e8f4f0; color: #1a9a6c; }
+        .sidebar-icon {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px; margin-bottom: 4px; background: #f0f2f5;
+        }
+        .sidebar-item.active .sidebar-icon { background: #1a9a6c; }
+        .sidebar-divider { width: 60px; height: 1px; background: #eee; margin: 8px 0; }
+        .sidebar-more { margin-top: auto; }
+        .main-wrap { margin-left: 90px; flex: 1; padding: 20px; max-width: 900px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+        .page-desc { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.6; }
+        .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        .tool-card {
+            background: #fff; border-radius: 10px; padding: 18px 16px; text-decoration: none;
+            color: #333; box-shadow: 0 1px 4px rgba(0,0,0,.06); transition: all .2s; display: block;
+        }
+        .tool-card:hover { box-shadow: 0 4px 16px rgba(26,154,108,.15); transform: translateY(-2px); border-color: #1a9a6c; }
+        .tool-card .tc-icon { font-size: 32px; margin-bottom: 10px; }
+        .tool-card .tc-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+        .tool-card .tc-desc { font-size: 12px; color: #888; line-height: 1.5; }
+        .section-title {
+            font-size: 13px; font-weight: 700; color: #888; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 12px; margin-top: 4px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-title::after { content: ''; flex: 1; height: 1px; background: #eee; }
+        .info-card {
+            background: #fff; border-radius: 10px; padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 16px;
+        }
+        .info-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #1a9a6c; display: inline-block; }
+        .info-list { list-style: none; }
+        .info-list li { font-size: 13px; color: #555; line-height: 2; padding-left: 16px; position: relative; }
+        .info-list li::before { content: '•'; position: absolute; left: 0; color: #1a9a6c; }
+        .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
+        .tag-new { background: #e8f4f0; color: #1a9a6c; }
+        .tag-hot { background: #fff3e0; color: #f57c00; }
+        @media (max-width: 600px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .tools-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <a class="sidebar-item" href="/">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item" href="/note.html">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+    <a class="sidebar-item" href="/work.html">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+    <a class="sidebar-item" href="/money.html">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-more">
+        <a class="sidebar-item active" href="/more.html">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<div class="main-wrap">
+    <div class="page-title">更多工具</div>
+    <div class="page-desc">汇聚常用在线工具，免费使用，旨在方便日常工作。</div>
+
+    <div class="section-title">本站工具</div>
+    <div class="tools-grid">
+        <a class="tool-card" href="/">
+            <div class="tc-icon">🔑</div>
+            <div class="tc-name">2FA验证工具 <span class="tag tag-hot">热门</span></div>
+            <div class="tc-desc">双重验证码获取，相当于谷歌身份验证器网页版</div>
+        </a>
+        <a class="tool-card" href="/note.html">
+            <div class="tc-icon">📝</div>
+            <div class="tc-name">文本处理</div>
+            <div class="tc-desc">Base64编解码、大小写转换、替换、去重、排序等</div>
+        </a>
+        <a class="tool-card" href="/work.html">
+            <div class="tc-icon">🖼️</div>
+            <div class="tc-name">图片处理</div>
+            <div class="tc-desc">为图片添加文字或图片元素，支持圆角，导出PNG</div>
+        </a>
+        <a class="tool-card" href="/money.html">
+            <div class="tc-icon">💱</div>
+            <div class="tc-name">汇率换算</div>
+            <div class="tc-desc">多币种汇率换算，支持人民币、美元、欧元等 25 种货币</div>
+        </a>
+        <a class="tool-card" href="https://json.eto.ccwu.cc/" target="_blank" rel="noopener">
+            <div class="tc-icon">🔄</div>
+            <div class="tc-name">ChatGPT Session 转换 <span class="tag tag-new">新</span></div>
+            <div class="tc-desc">将 ChatGPT Web Session JSON 转为 sub2api / Cockpit 格式，本地解析不上传</div>
+        </a>
+        <a class="tool-card" href="https://ms.eto.ccwu.cc/" target="_blank" rel="noopener">
+            <div class="tc-icon">📬</div>
+            <div class="tc-name">MS 邮箱管理 <span class="tag tag-new">新</span></div>
+            <div class="tc-desc">MS OAuth2 API 配套工具，支持邮箱导入/导出、收件箱管理、批量操作</div>
+        </a>
+    </div>
+
+    <div class="section-title">推荐工具</div>
+    <div class="tools-grid">
+        <a class="tool-card" href="https://tool.lu" target="_blank" rel="noopener">
+            <div class="tc-icon">🛠️</div>
+            <div class="tc-name">工具lu</div>
+            <div class="tc-desc">综合在线工具箱，涵盖开发、加密、格式转换等</div>
+        </a>
+        <a class="tool-card" href="https://www.bejson.com" target="_blank" rel="noopener">
+            <div class="tc-icon">📋</div>
+            <div class="tc-name">BeJSON</div>
+            <div class="tc-desc">JSON格式化、校验、转义及各类开发工具</div>
+        </a>
+        <a class="tool-card" href="https://regex101.com" target="_blank" rel="noopener">
+            <div class="tc-icon">🔍</div>
+            <div class="tc-name">Regex101</div>
+            <div class="tc-desc">正则表达式在线测试与调试工具</div>
+        </a>
+        <a class="tool-card" href="https://tinypng.com" target="_blank" rel="noopener">
+            <div class="tc-icon">🗜️</div>
+            <div class="tc-name">TinyPNG</div>
+            <div class="tc-desc">在线图片压缩，支持PNG和JPG格式</div>
+        </a>
+        <a class="tool-card" href="https://squoosh.app" target="_blank" rel="noopener">
+            <div class="tc-icon">📸</div>
+            <div class="tc-name">Squoosh</div>
+            <div class="tc-desc">Google出品的高级图片压缩与转换工具</div>
+        </a>
+        <a class="tool-card" href="https://www.epochconverter.com" target="_blank" rel="noopener">
+            <div class="tc-icon">⏱️</div>
+            <div class="tc-name">时间戳转换</div>
+            <div class="tc-desc">Unix时间戳与日期时间互转</div>
+        </a>
+        <a class="tool-card" href="https://caniuse.com" target="_blank" rel="noopener">
+            <div class="tc-icon">🌐</div>
+            <div class="tc-name">Can I Use</div>
+            <div class="tc-desc">浏览器兼容性查询，前端开发必备</div>
+        </a>
+        <a class="tool-card" href="https://www.ilovepdf.com/zh-cn" target="_blank" rel="noopener">
+            <div class="tc-icon">📄</div>
+            <div class="tc-name">iLovePDF</div>
+            <div class="tc-desc">PDF合并、分割、压缩、转换等在线工具</div>
+        </a>
+    </div>
+
+    <div class="info-card">
+        <div class="info-title">关于本站</div>
+        <ul class="info-list">
+            <li>本站所有工具完全免费使用，不收费、不打广告。</li>
+            <li>所有运算在浏览器本地完成，密钥等敏感数据不会上传服务器。</li>
+            <li>如发现BUG或功能建议，欢迎反馈。</li>
+            <li>最近维护：2026年5月</li>
+        </ul>
+    </div>
+</div>
+
+</body>
+</html>

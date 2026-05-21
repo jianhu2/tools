@@ -1,0 +1,13 @@
+services:
+  ms-oauth2api:
+    build: ./app
+    container_name: ms-oauth2api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - PASSWORD=
+      - USE_REDIS=0
+      - PORT=3000
+    volumes:
+      - ./logs:/app/logs

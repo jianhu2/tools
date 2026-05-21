@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片处理 - 在线工具</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5; color: #333; min-height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 90px; min-height: 100vh; background: #fff; border-right: 1px solid #e8e8e8;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+        .sidebar-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; color: #666; font-size: 11px; margin-bottom: 4px;
+            transition: all .2s; text-align: center; line-height: 1.3;
+        }
+        .sidebar-item:hover { background: #f5f5f5; color: #333; }
+        .sidebar-item.active { background: #e8f4f0; color: #1a9a6c; }
+        .sidebar-icon {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px; margin-bottom: 4px; background: #f0f2f5;
+        }
+        .sidebar-item.active .sidebar-icon { background: #1a9a6c; }
+        .sidebar-divider { width: 60px; height: 1px; background: #eee; margin: 8px 0; }
+        .sidebar-more { margin-top: auto; }
+        .main-wrap { margin-left: 90px; flex: 1; padding: 20px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+        .page-desc { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.6; }
+
+        .editor-layout { display: flex; gap: 16px; align-items: flex-start; }
+
+        /* Canvas area */
+        .canvas-wrap {
+            flex: 1; background: #fff; border-radius: 10px; padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06); min-width: 0;
+        }
+        #canvas {
+            display: block; max-width: 100%; border: 1px dashed #ccc; border-radius: 6px;
+            cursor: default; background: #f8f8f8;
+        }
+        #canvas.drag-over { border-color: #1a9a6c; border-style: solid; }
+        .canvas-hint {
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            gap: 8px; min-height: 280px; color: #bbb; font-size: 14px;
+        }
+        .canvas-hint .hint-icon { font-size: 48px; }
+        .canvas-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+        /* Right panel */
+        .right-panel { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+        .panel-card {
+            background: #fff; border-radius: 10px; padding: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .panel-label { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+        .form-row { margin-bottom: 10px; }
+        .form-row label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+        .form-row input[type=text], .form-row input[type=number], .form-row input[type=color], .form-row select {
+            width: 100%; border: 1.5px solid #ddd; border-radius: 6px; padding: 6px 10px;
+            font-size: 13px; outline: none; transition: border-color .2s; background: #fafafa;
+        }
+        .form-row input[type=range] { width: 100%; accent-color: #1a9a6c; }
+        .form-row input:focus, .form-row select:focus { border-color: #1a9a6c; background: #fff; }
+        .form-row input[type=color] { padding: 2px 4px; height: 34px; cursor: pointer; }
+        .range-row { display: flex; gap: 6px; align-items: center; }
+        .range-val { font-size: 12px; color: #888; min-width: 28px; text-align: right; }
+
+        /* Object list */
+        .obj-list { list-style: none; }
+        .obj-item {
+            display: flex; align-items: center; gap: 6px; padding: 5px 7px;
+            border-radius: 6px; cursor: pointer; font-size: 12px; color: #555;
+            border: 1.5px solid transparent; margin-bottom: 3px; transition: all .15s;
+        }
+        .obj-item:hover { background: #f5f5f5; }
+        .obj-item.selected { background: #e8f4f0; border-color: #1a9a6c; color: #1a9a6c; }
+        .obj-item .obj-icon { font-size: 14px; }
+        .obj-item .obj-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .obj-item .obj-del { color: #ccc; cursor: pointer; font-size: 16px; line-height: 1; }
+        .obj-item .obj-del:hover { color: #e53935; }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 14px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all .15s; white-space: nowrap;
+        }
+        .btn-primary { background: #1a9a6c; color: white; }
+        .btn-primary:hover { background: #148a5e; }
+        .btn-secondary { background: #f0f2f5; color: #555; border: 1.5px solid #e0e2e5; }
+        .btn-secondary:hover { background: #e0e2e5; }
+        .btn-danger { background: #fff0f0; color: #e53935; border: 1.5px solid #ffc1c2; }
+        .btn-danger:hover { background: #ffe0e0; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: rgba(0,0,0,.8); color: white; padding: 10px 22px; border-radius: 20px;
+            font-size: 13px; font-weight: 500; z-index: 9999; pointer-events: none;
+            transition: transform .3s ease; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+
+        .drop-zone {
+            border: 2px dashed #ccc; border-radius: 8px; padding: 30px 20px; text-align: center;
+            color: #bbb; font-size: 13px; cursor: pointer; transition: all .2s; background: #fafafa;
+        }
+        .drop-zone:hover, .drop-zone.active { border-color: #1a9a6c; color: #1a9a6c; background: #f0fff8; }
+        .drop-zone .dz-icon { font-size: 36px; margin-bottom: 8px; }
+
+        @media (max-width: 800px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .editor-layout { flex-direction: column; }
+            .right-panel { width: 100%; flex-direction: row; flex-wrap: wrap; }
+            .panel-card { flex: 1; min-width: 180px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <a class="sidebar-item" href="/">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item" href="/note.html">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+    <a class="sidebar-item active" href="/work.html">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+    <a class="sidebar-item" href="/money.html">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-more">
+        <a class="sidebar-item" href="/more.html">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<div class="main-wrap">
+    <div class="page-title">图片处理</div>
+    <div class="page-desc">可为图片添加图片或文字元素（可拖拽），可设置背景图圆角，导出 PNG。</div>
+
+    <div class="editor-layout">
+        <!-- Canvas area -->
+        <div class="canvas-wrap">
+            <div id="dropZone" class="drop-zone" onclick="document.getElementById('bgInput').click()"
+                 ondragover="dzDragOver(event)" ondragleave="dzDragLeave(event)" ondrop="dzDrop(event)">
+                <div class="dz-icon">🖼️</div>
+                <div>点击或拖入背景图片</div>
+                <div style="font-size:11px;margin-top:4px;color:#ccc">支持 JPG / PNG / WebP / GIF</div>
+            </div>
+            <canvas id="canvas" style="display:none;cursor:default"></canvas>
+            <input type="file" id="bgInput" accept="image/*" style="display:none" onchange="loadBg(this)">
+            <div class="canvas-actions">
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('bgInput').click()">更换背景</button>
+                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('overlayInput').click()">添加图片</button>
+                <button class="btn btn-secondary btn-sm" onclick="addText()">添加文字</button>
+                <button class="btn btn-primary btn-sm" onclick="exportPNG()">导出 PNG</button>
+                <button class="btn btn-danger btn-sm" onclick="clearAll()">清空</button>
+            </div>
+            <input type="file" id="overlayInput" accept="image/*" style="display:none" onchange="addOverlay(this)">
+        </div>
+
+        <!-- Right panel -->
+        <div class="right-panel">
+            <!-- Background settings -->
+            <div class="panel-card">
+                <div class="panel-label">背景设置</div>
+                <div class="form-row">
+                    <label>圆角 (px)</label>
+                    <div class="range-row">
+                        <input type="range" id="radiusRange" min="0" max="200" value="0" oninput="updateRadius(this.value)">
+                        <span class="range-val" id="radiusVal">0</span>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label>画布宽度</label>
+                    <input type="number" id="canvasW" min="100" max="4000" value="800" oninput="resizeCanvas()">
+                </div>
+                <div class="form-row">
+                    <label>画布高度</label>
+                    <input type="number" id="canvasH" min="100" max="4000" value="600" oninput="resizeCanvas()">
+                </div>
+            </div>
+
+            <!-- Element settings -->
+            <div class="panel-card" id="elemPanel">
+                <div class="panel-label">属性面板</div>
+                <div id="noElem" style="font-size:12px;color:#bbb;text-align:center;padding:10px 0">
+                    点击元素进行选中编辑
+                </div>
+                <div id="elemProps" style="display:none">
+                    <div class="form-row" id="textPropRow" style="display:none">
+                        <label>文字内容</label>
+                        <input type="text" id="elemText" oninput="updateSelectedProp()">
+                    </div>
+                    <div class="form-row" id="fontSizePropRow" style="display:none">
+                        <label>字体大小</label>
+                        <div class="range-row">
+                            <input type="range" id="elemFontSize" min="8" max="200" value="32" oninput="updateSelectedProp()">
+                            <span class="range-val" id="fontSizeVal">32</span>
+                        </div>
+                    </div>
+                    <div class="form-row" id="colorPropRow" style="display:none">
+                        <label>颜色</label>
+                        <input type="color" id="elemColor" value="#ffffff" oninput="updateSelectedProp()">
+                    </div>
+                    <div class="form-row">
+                        <label>透明度</label>
+                        <div class="range-row">
+                            <input type="range" id="elemOpacity" min="0" max="100" value="100" oninput="updateSelectedProp()">
+                            <span class="range-val" id="opacityVal">100%</span>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label>X 位置</label>
+                        <input type="number" id="elemX" oninput="updateSelectedProp()">
+                    </div>
+                    <div class="form-row">
+                        <label>Y 位置</label>
+                        <input type="number" id="elemY" oninput="updateSelectedProp()">
+                    </div>
+                    <div class="form-row" id="scalePropRow">
+                        <label>缩放</label>
+                        <div class="range-row">
+                            <input type="range" id="elemScale" min="10" max="400" value="100" oninput="updateSelectedProp()">
+                            <span class="range-val" id="scaleVal">100%</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:8px">
+                        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">删除元素</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Object list -->
+            <div class="panel-card">
+                <div class="panel-label">对象列表 (顶→底)</div>
+                <ul class="obj-list" id="objList">
+                    <li style="font-size:12px;color:#bbb;text-align:center;padding:8px 0">暂无元素</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let bgImage = null;
+let cornerRadius = 0;
+let elements = []; // [{type:'image'|'text', img, text, x, y, scale, opacity, fontSize, color, id}]
+let selectedId = null;
+let nextId = 1;
+let dragging = false;
+let dragOffX = 0, dragOffY = 0;
+let canvasW = 800, canvasH = 600;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function showToast(msg, dur = 2000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function dzDragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('active'); }
+function dzDragLeave() { document.getElementById('dropZone').classList.remove('active'); }
+function dzDrop(e) {
+    e.preventDefault();
+    dzDragLeave();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadBgFile(file);
+}
+
+function loadBg(input) { if (input.files[0]) loadBgFile(input.files[0]); }
+function loadBgFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            bgImage = img;
+            // Set canvas to image dimensions if not set
+            canvasW = img.naturalWidth || 800;
+            canvasH = img.naturalHeight || 600;
+            document.getElementById('canvasW').value = canvasW;
+            document.getElementById('canvasH').value = canvasH;
+            canvas.width = canvasW;
+            canvas.height = canvasH;
+            document.getElementById('dropZone').style.display = 'none';
+            canvas.style.display = 'block';
+            render();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function addOverlay(input) {
+    if (!input.files[0]) return;
+    if (!bgImage) { showToast('请先上传背景图片'); return; }
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+            const el = { type: 'image', img, x: 20, y: 20, scale: 100, opacity: 100, id: nextId++ };
+            elements.unshift(el);
+            renderObjList();
+            selectElem(el.id);
+            render();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+}
+
+function addText() {
+    if (!bgImage) { showToast('请先上传背景图片'); return; }
+    const el = { type: 'text', text: '双击编辑文字', x: 50, y: 80, scale: 100, opacity: 100, fontSize: 32, color: '#ffffff', id: nextId++ };
+    elements.unshift(el);
+    renderObjList();
+    selectElem(el.id);
+    render();
+}
+
+function updateRadius(v) {
+    cornerRadius = parseInt(v);
+    document.getElementById('radiusVal').textContent = v;
+    render();
+}
+
+function resizeCanvas() {
+    canvasW = parseInt(document.getElementById('canvasW').value) || 800;
+    canvasH = parseInt(document.getElementById('canvasH').value) || 600;
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    render();
+}
+
+function render() {
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    if (!bgImage) return;
+
+    ctx.save();
+    if (cornerRadius > 0) {
+        ctx.beginPath();
+        const r = Math.min(cornerRadius, canvasW / 2, canvasH / 2);
+        ctx.moveTo(r, 0);
+        ctx.lineTo(canvasW - r, 0);
+        ctx.quadraticCurveTo(canvasW, 0, canvasW, r);
+        ctx.lineTo(canvasW, canvasH - r);
+        ctx.quadraticCurveTo(canvasW, canvasH, canvasW - r, canvasH);
+        ctx.lineTo(r, canvasH);
+        ctx.quadraticCurveTo(0, canvasH, 0, canvasH - r);
+        ctx.lineTo(0, r);
+        ctx.quadraticCurveTo(0, 0, r, 0);
+        ctx.closePath();
+        ctx.clip();
+    }
+    ctx.drawImage(bgImage, 0, 0, canvasW, canvasH);
+    ctx.restore();
+
+    // Draw elements from bottom to top (reversed for rendering)
+    for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        ctx.save();
+        ctx.globalAlpha = el.opacity / 100;
+        if (el.type === 'image') {
+            const w = el.img.naturalWidth * (el.scale / 100);
+            const h = el.img.naturalHeight * (el.scale / 100);
+            ctx.drawImage(el.img, el.x, el.y, w, h);
+        } else {
+            ctx.font = `${el.fontSize * (el.scale / 100)}px -apple-system, sans-serif`;
+            ctx.fillStyle = el.color;
+            ctx.fillText(el.text, el.x, el.y);
+        }
+        if (el.id === selectedId) {
+            ctx.strokeStyle = '#1a9a6c';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            const bounds = getElemBounds(el);
+            ctx.strokeRect(bounds.x - 4, bounds.y - 4, bounds.w + 8, bounds.h + 8);
+            ctx.setLineDash([]);
+        }
+        ctx.restore();
+    }
+}
+
+function getElemBounds(el) {
+    if (el.type === 'image') {
+        return { x: el.x, y: el.y, w: el.img.naturalWidth * (el.scale / 100), h: el.img.naturalHeight * (el.scale / 100) };
+    } else {
+        const fs = el.fontSize * (el.scale / 100);
+        ctx.font = `${fs}px -apple-system, sans-serif`;
+        const metrics = ctx.measureText(el.text);
+        return { x: el.x, y: el.y - fs, w: metrics.width, h: fs * 1.2 };
+    }
+}
+
+function hitTest(x, y) {
+    for (const el of elements) {
+        const b = getElemBounds(el);
+        if (x >= b.x - 4 && x <= b.x + b.w + 8 && y >= b.y - 4 && y <= b.y + b.h + 8) return el;
+    }
+    return null;
+}
+
+function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+}
+
+canvas.addEventListener('mousedown', e => {
+    const pos = getCanvasPos(e);
+    const hit = hitTest(pos.x, pos.y);
+    if (hit) {
+        selectElem(hit.id);
+        dragging = true;
+        dragOffX = pos.x - hit.x;
+        dragOffY = pos.y - hit.y;
+        canvas.style.cursor = 'grabbing';
+    } else {
+        selectedId = null;
+        showElemProps(null);
+        render();
+    }
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const pos = getCanvasPos(e);
+    const el = elements.find(el => el.id === selectedId);
+    if (!el) return;
+    el.x = Math.round(pos.x - dragOffX);
+    el.y = Math.round(pos.y - dragOffY);
+    document.getElementById('elemX').value = el.x;
+    document.getElementById('elemY').value = el.y;
+    render();
+});
+
+canvas.addEventListener('mouseup', () => { dragging = false; canvas.style.cursor = 'default'; });
+canvas.addEventListener('mouseleave', () => { dragging = false; canvas.style.cursor = 'default'; });
+
+canvas.addEventListener('wheel', e => {
+    if (selectedId === null) return;
+    e.preventDefault();
+    const el = elements.find(el => el.id === selectedId);
+    if (!el) return;
+    el.scale = Math.max(10, Math.min(400, el.scale - Math.sign(e.deltaY) * 5));
+    document.getElementById('elemScale').value = el.scale;
+    document.getElementById('scaleVal').textContent = el.scale + '%';
+    render();
+}, { passive: false });
+
+function selectElem(id) {
+    selectedId = id;
+    const el = elements.find(e => e.id === id);
+    showElemProps(el);
+    renderObjList();
+    render();
+}
+
+function showElemProps(el) {
+    document.getElementById('noElem').style.display = el ? 'none' : 'block';
+    document.getElementById('elemProps').style.display = el ? 'block' : 'none';
+    if (!el) return;
+    document.getElementById('elemOpacity').value = el.opacity;
+    document.getElementById('opacityVal').textContent = el.opacity + '%';
+    document.getElementById('elemX').value = el.x;
+    document.getElementById('elemY').value = el.y;
+    document.getElementById('elemScale').value = el.scale;
+    document.getElementById('scaleVal').textContent = el.scale + '%';
+    const isText = el.type === 'text';
+    document.getElementById('textPropRow').style.display = isText ? 'block' : 'none';
+    document.getElementById('fontSizePropRow').style.display = isText ? 'block' : 'none';
+    document.getElementById('colorPropRow').style.display = isText ? 'block' : 'none';
+    if (isText) {
+        document.getElementById('elemText').value = el.text;
+        document.getElementById('elemFontSize').value = el.fontSize;
+        document.getElementById('fontSizeVal').textContent = el.fontSize;
+        document.getElementById('elemColor').value = el.color;
+    }
+}
+
+function updateSelectedProp() {
+    const el = elements.find(e => e.id === selectedId);
+    if (!el) return;
+    el.opacity = parseInt(document.getElementById('elemOpacity').value);
+    document.getElementById('opacityVal').textContent = el.opacity + '%';
+    el.x = parseInt(document.getElementById('elemX').value) || 0;
+    el.y = parseInt(document.getElementById('elemY').value) || 0;
+    el.scale = parseInt(document.getElementById('elemScale').value);
+    document.getElementById('scaleVal').textContent = el.scale + '%';
+    if (el.type === 'text') {
+        el.text = document.getElementById('elemText').value;
+        el.fontSize = parseInt(document.getElementById('elemFontSize').value);
+        document.getElementById('fontSizeVal').textContent = el.fontSize;
+        el.color = document.getElementById('elemColor').value;
+    }
+    renderObjList();
+    render();
+}
+
+function deleteSelected() {
+    elements = elements.filter(e => e.id !== selectedId);
+    selectedId = null;
+    showElemProps(null);
+    renderObjList();
+    render();
+}
+
+function renderObjList() {
+    const list = document.getElementById('objList');
+    if (elements.length === 0) {
+        list.innerHTML = '<li style="font-size:12px;color:#bbb;text-align:center;padding:8px 0">暂无元素</li>';
+        return;
+    }
+    list.innerHTML = elements.map(el => `
+        <li class="obj-item ${el.id === selectedId ? 'selected' : ''}" onclick="selectElem(${el.id})">
+            <span class="obj-icon">${el.type === 'text' ? '🔤' : '🖼️'}</span>
+            <span class="obj-name">${el.type === 'text' ? el.text : '图片'}</span>
+            <span class="obj-del" onclick="event.stopPropagation();deleteElem(${el.id})">×</span>
+        </li>
+    `).join('');
+}
+
+function deleteElem(id) {
+    elements = elements.filter(e => e.id !== id);
+    if (selectedId === id) { selectedId = null; showElemProps(null); }
+    renderObjList();
+    render();
+}
+
+function clearAll() {
+    elements = [];
+    bgImage = null;
+    selectedId = null;
+    cornerRadius = 0;
+    document.getElementById('radiusRange').value = 0;
+    document.getElementById('radiusVal').textContent = '0';
+    document.getElementById('dropZone').style.display = '';
+    canvas.style.display = 'none';
+    ctx.clearRect(0, 0, canvasW, canvasH);
+    showElemProps(null);
+    renderObjList();
+}
+
+function exportPNG() {
+    if (!bgImage) { showToast('请先上传背景图片'); return; }
+    selectedId = null;
+    render();
+    const a = document.createElement('a');
+    a.download = 'image_' + Date.now() + '.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    showToast('图片已导出');
+}
+</script>
+</body>
+</html>

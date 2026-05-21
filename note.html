@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本处理 - 在线工具</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5; color: #333; min-height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 90px; min-height: 100vh; background: #fff; border-right: 1px solid #e8e8e8;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+        .sidebar-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; color: #666; font-size: 11px; margin-bottom: 4px;
+            transition: all .2s; text-align: center; line-height: 1.3;
+        }
+        .sidebar-item:hover { background: #f5f5f5; color: #333; }
+        .sidebar-item.active { background: #e8f4f0; color: #1a9a6c; }
+        .sidebar-icon {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px; margin-bottom: 4px; background: #f0f2f5;
+        }
+        .sidebar-item.active .sidebar-icon { background: #1a9a6c; }
+        .sidebar-divider { width: 60px; height: 1px; background: #eee; margin: 8px 0; }
+        .sidebar-more { margin-top: auto; }
+        .main-wrap { margin-left: 90px; flex: 1; padding: 20px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+        .page-desc { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.6; }
+        .note-layout { display: flex; gap: 16px; align-items: flex-start; }
+        .btn-panel {
+            width: 160px; flex-shrink: 0; background: #fff; border-radius: 10px; padding: 14px 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .btn-group { margin-bottom: 12px; }
+        .btn-group-label { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+        .txt-btn {
+            display: block; width: 100%; padding: 7px 10px; margin-bottom: 4px; background: #f7f9fa;
+            border: 1.5px solid #e5e8eb; border-radius: 7px; font-size: 12px; color: #444;
+            cursor: pointer; text-align: left; transition: all .15s; font-family: inherit;
+        }
+        .txt-btn:hover { background: #e8f4f0; border-color: #1a9a6c; color: #1a9a6c; }
+        .txt-btn.danger:hover { background: #fff0f0; border-color: #ff4d4f; color: #ff4d4f; }
+        .editor-area { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+        .textarea-wrap { position: relative; }
+        .textarea-label {
+            font-size: 12px; font-weight: 600; color: #888; margin-bottom: 6px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .textarea-label .char-count { font-weight: 400; color: #bbb; }
+        textarea {
+            width: 100%; min-height: 220px; border: 1.5px solid #ddd; border-radius: 8px;
+            padding: 12px 14px; font-size: 13px; font-family: 'Courier New', monospace;
+            color: #333; resize: vertical; outline: none; line-height: 1.7;
+            transition: border-color .2s; background: #fafafa;
+        }
+        textarea:focus { border-color: #1a9a6c; background: #fff; }
+        .divider-row {
+            display: flex; align-items: center; gap: 10px;
+        }
+        .divider-line { flex: 1; height: 1px; background: #eee; }
+        .divider-label { font-size: 11px; color: #bbb; }
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: rgba(0,0,0,.8); color: white; padding: 10px 22px; border-radius: 20px;
+            font-size: 13px; font-weight: 500; z-index: 9999; pointer-events: none;
+            transition: transform .3s ease; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        /* modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+            z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: white; border-radius: 12px; padding: 24px; width: min(400px, 92vw);
+            box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        }
+        .modal-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+        .modal-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .modal-input {
+            flex: 1; border: 1.5px solid #ddd; border-radius: 7px; padding: 8px 12px;
+            font-size: 13px; outline: none; transition: border-color .2s; min-width: 80px;
+        }
+        .modal-input:focus { border-color: #1a9a6c; }
+        .modal-label { font-size: 12px; color: #888; white-space: nowrap; }
+        .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+        .btn-primary {
+            padding: 8px 18px; background: #1a9a6c; color: white; border: none;
+            border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .btn-primary:hover { background: #148a5e; }
+        .btn-secondary {
+            padding: 8px 18px; background: #f0f2f5; color: #666; border: none;
+            border-radius: 7px; font-size: 13px; cursor: pointer;
+        }
+        .btn-secondary:hover { background: #e0e2e5; }
+        @media (max-width: 700px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .note-layout { flex-direction: column; }
+            .btn-panel { width: 100%; }
+            .btn-group-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+            .btn-group { margin-bottom: 6px; }
+            .txt-btn { display: inline-block; width: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <a class="sidebar-item" href="/">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item active" href="/note.html">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+    <a class="sidebar-item" href="/work.html">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+    <a class="sidebar-item" href="/money.html">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-more">
+        <a class="sidebar-item" href="/more.html">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<div class="main-wrap">
+    <div class="page-title">文本处理</div>
+    <div class="page-desc">输入框(上)的内容改变时会自动保存在本地缓存中，输出框(下)结果不会保存。</div>
+
+    <div class="note-layout">
+        <!-- Button panel -->
+        <div class="btn-panel">
+            <div class="btn-group">
+                <div class="btn-group-label">文件操作</div>
+                <button class="txt-btn" onclick="loadCache()">加载本地缓存</button>
+                <button class="txt-btn danger" onclick="clearAll()">清除全部内容</button>
+                <button class="txt-btn" onclick="exportText('input')">导出输入文本</button>
+                <button class="txt-btn" onclick="exportText('output')">导出结果文本</button>
+                <button class="txt-btn" onclick="copyResult()">复制处理结果</button>
+                <button class="txt-btn" onclick="moveToInput()">结果转到输入框</button>
+            </div>
+            <div class="btn-group">
+                <div class="btn-group-label">文本清理</div>
+                <button class="txt-btn" onclick="openReplaceModal()">替换或添加</button>
+                <button class="txt-btn" onclick="htmlToText()">HTML文本化</button>
+                <button class="txt-btn" onclick="clearHtmlTags()">清除HTML标签</button>
+                <button class="txt-btn" onclick="clearLineSpaces()">清除每行空格</button>
+                <button class="txt-btn" onclick="clearBlankLines()">清除空白行</button>
+                <button class="txt-btn" onclick="mergeLines()">合并多行</button>
+            </div>
+            <div class="btn-group">
+                <div class="btn-group-label">大小写转换</div>
+                <button class="txt-btn" onclick="capitalizeFirst()">首字母大写</button>
+                <button class="txt-btn" onclick="toUpperCase()">字母全部大写</button>
+                <button class="txt-btn" onclick="toLowerCase()">字母全部小写</button>
+                <button class="txt-btn" onclick="toPinyin()">汉字转拼音</button>
+            </div>
+            <div class="btn-group">
+                <div class="btn-group-label">编码转换</div>
+                <button class="txt-btn" onclick="base64Encode()">Base64编码</button>
+                <button class="txt-btn" onclick="base64Decode()">Base64解码</button>
+                <button class="txt-btn" onclick="urlEncode()">URL编码</button>
+                <button class="txt-btn" onclick="urlDecode()">URL解码</button>
+            </div>
+            <div class="btn-group">
+                <div class="btn-group-label">统计</div>
+                <button class="txt-btn" onclick="countLines()">统计行数</button>
+                <button class="txt-btn" onclick="dedupLines()">去除重复行</button>
+                <button class="txt-btn" onclick="sortLines()">行排序(A-Z)</button>
+                <button class="txt-btn" onclick="reverseLines()">行倒序</button>
+            </div>
+        </div>
+
+        <!-- Editors -->
+        <div class="editor-area">
+            <div class="textarea-wrap">
+                <div class="textarea-label">
+                    <span>输入框</span>
+                    <span class="char-count" id="inputCount">0 字符 / 0 行</span>
+                </div>
+                <textarea id="inputBox" placeholder="在此输入或粘贴文本内容..." oninput="onInputChange()"></textarea>
+            </div>
+
+            <div class="divider-row">
+                <div class="divider-line"></div>
+                <div class="divider-label">↓ 处理结果</div>
+                <div class="divider-line"></div>
+            </div>
+
+            <div class="textarea-wrap">
+                <div class="textarea-label">
+                    <span>结果框</span>
+                    <span class="char-count" id="outputCount">0 字符 / 0 行</span>
+                </div>
+                <textarea id="outputBox" placeholder="处理结果将显示在此..." readonly></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Replace modal -->
+<div class="modal-overlay" id="replaceModal">
+    <div class="modal-box">
+        <h3>替换或添加内容</h3>
+        <div class="modal-row">
+            <span class="modal-label">查找：</span>
+            <input class="modal-input" id="findText" placeholder="要查找的内容（留空=每行首尾）">
+        </div>
+        <div class="modal-row">
+            <span class="modal-label">替换：</span>
+            <input class="modal-input" id="replaceText" placeholder="替换为（留空=删除）">
+        </div>
+        <div class="modal-row">
+            <span class="modal-label">每行首添加：</span>
+            <input class="modal-input" id="addPrefix" placeholder="可选">
+        </div>
+        <div class="modal-row">
+            <span class="modal-label">每行尾添加：</span>
+            <input class="modal-input" id="addSuffix" placeholder="可选">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal()">取消</button>
+            <button class="btn-primary" onclick="doReplace()">执行</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const CACHE_KEY = 'note_input_cache';
+const inputBox = document.getElementById('inputBox');
+const outputBox = document.getElementById('outputBox');
+
+function showToast(msg, duration = 2000) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function updateCount() {
+    const inp = inputBox.value;
+    const out = outputBox.value;
+    const lines = s => s === '' ? 0 : s.split('\n').length;
+    document.getElementById('inputCount').textContent = `${inp.length} 字符 / ${lines(inp)} 行`;
+    document.getElementById('outputCount').textContent = `${out.length} 字符 / ${lines(out)} 行`;
+}
+
+function onInputChange() {
+    localStorage.setItem(CACHE_KEY, inputBox.value);
+    updateCount();
+}
+
+function loadCache() {
+    const cached = localStorage.getItem(CACHE_KEY) || '';
+    if (!cached) { showToast('本地缓存为空'); return; }
+    inputBox.value = cached;
+    updateCount();
+    showToast('已加载本地缓存');
+}
+
+function clearAll() {
+    inputBox.value = '';
+    outputBox.value = '';
+    updateCount();
+    showToast('已清除全部内容');
+}
+
+function exportText(which) {
+    const content = which === 'input' ? inputBox.value : outputBox.value;
+    if (!content) { showToast('内容为空'); return; }
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = which === 'input' ? 'input.txt' : 'result.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function copyResult() {
+    if (!outputBox.value) { showToast('结果框为空'); return; }
+    navigator.clipboard.writeText(outputBox.value).then(() => showToast('已复制到剪贴板'));
+}
+
+function moveToInput() {
+    if (!outputBox.value) { showToast('结果框为空'); return; }
+    inputBox.value = outputBox.value;
+    outputBox.value = '';
+    onInputChange();
+    showToast('结果已转到输入框');
+}
+
+// Text processing functions
+function process(fn) {
+    const lines = inputBox.value.split('\n');
+    outputBox.value = fn(lines, inputBox.value);
+    updateCount();
+}
+
+function htmlToText() {
+    const div = document.createElement('div');
+    div.innerHTML = inputBox.value;
+    outputBox.value = (div.innerText || div.textContent || '').replace(/\n{3,}/g, '\n\n');
+    updateCount();
+}
+
+function clearHtmlTags() {
+    outputBox.value = inputBox.value.replace(/<[^>]+>/g, '');
+    updateCount();
+}
+
+function clearLineSpaces() {
+    process(lines => lines.map(l => l.trim()).join('\n'));
+}
+
+function clearBlankLines() {
+    process(lines => lines.filter(l => l.trim() !== '').join('\n'));
+}
+
+function mergeLines() {
+    outputBox.value = inputBox.value.replace(/[\r\n]+/g, ' ').trim();
+    updateCount();
+}
+
+function capitalizeFirst() {
+    process(lines => lines.map(l => l.replace(/\b[a-z]/g, c => c.toUpperCase())).join('\n'));
+}
+
+function toUpperCase() {
+    outputBox.value = inputBox.value.toUpperCase();
+    updateCount();
+}
+
+function toLowerCase() {
+    outputBox.value = inputBox.value.toLowerCase();
+    updateCount();
+}
+
+function toPinyin() {
+    // Simple pinyin map for common characters
+    const pinyinMap = {"的":"de","一":"yi","是":"shi","了":"le","我":"wo","不":"bu","人":"ren","在":"zai","他":"ta","有":"you","这":"zhe","中":"zhong","大":"da","来":"lai","上":"shang","国":"guo","个":"ge","到":"dao","说":"shuo","们":"men","为":"wei","子":"zi","和":"he","你":"ni","地":"di","出":"chu","道":"dao","也":"ye","时":"shi","年":"nian","得":"de","就":"jiu","那":"na","要":"yao","下":"xia","以":"yi","生":"sheng","会":"hui","自":"zi","着":"zhe","去":"qu","之":"zhi","过":"guo","家":"jia","学":"xue","对":"dui","可":"ke","她":"ta","里","li","后":"hou","小":"xiao","么":"me","心":"xin","多":"duo","天":"tian","而":"er","能":"neng","好":"hao","都":"dou","然":"ran","没":"mei","日":"ri","于":"yu","起":"qi","还","huan","发":"fa","成":"cheng","事":"shi","只":"zhi","作":"zuo","当":"dang","想":"xiang","看":"kan","文":"wen","无":"wu","开":"kai","手":"shou","十":"shi","用":"yong","主":"zhu","行":"xing","方":"fang","又":"you","如":"ru","前":"qian","所":"suo","本":"ben","见":"jian","经":"jing","头":"tou","面":"mian","公":"gong","同":"tong","三":"san","已":"yi","老":"lao","从":"cong","动":"dong","两":"liang","长":"chang","知":"zhi","民","min","们":"men","六":"liu","问":"wen","很":"hen","最":"zui","重":"zhong","并":"bing","女":"nv","美":"mei","父":"fu","直":"zhi","意":"yi","正":"zheng","了":"le","次":"ci","啊":"a","别":"bie","但":"dan","明":"ming","更":"geng","四":"si","五":"wu","把":"ba","被":"bei","真":"zhen","全":"quan","活":"huo","计":"ji","特":"te","可":"ke","物":"wu","运":"yun","平":"ping","保":"bao","定":"ding","热":"re","员":"yuan","强":"qiang","数":"shu","打":"da","外":"wai","各":"ge","结":"jie","什":"shen","么":"me","么":"me"};
+    const result = inputBox.value.split('').map(c => {
+        if (pinyinMap[c]) return pinyinMap[c];
+        if (/[一-龥]/.test(c)) return c; // keep unmapped Chinese
+        return c;
+    }).join('');
+    outputBox.value = result;
+    updateCount();
+    showToast('注：部分生僻字可能无法转换');
+}
+
+function base64Encode() {
+    try {
+        outputBox.value = btoa(unescape(encodeURIComponent(inputBox.value)));
+        updateCount();
+    } catch(e) { showToast('编码失败：' + e.message); }
+}
+
+function base64Decode() {
+    try {
+        outputBox.value = decodeURIComponent(escape(atob(inputBox.value.trim())));
+        updateCount();
+    } catch(e) { showToast('解码失败：内容不是有效的Base64'); }
+}
+
+function urlEncode() {
+    outputBox.value = encodeURIComponent(inputBox.value);
+    updateCount();
+}
+
+function urlDecode() {
+    try {
+        outputBox.value = decodeURIComponent(inputBox.value);
+        updateCount();
+    } catch(e) { showToast('解码失败：内容格式错误'); }
+}
+
+function countLines() {
+    const lines = inputBox.value.split('\n');
+    const nonEmpty = lines.filter(l => l.trim() !== '').length;
+    showToast(`共 ${lines.length} 行，非空 ${nonEmpty} 行，${inputBox.value.length} 字符`);
+}
+
+function dedupLines() {
+    process(lines => {
+        const seen = new Set();
+        return lines.filter(l => {
+            if (seen.has(l)) return false;
+            seen.add(l);
+            return true;
+        }).join('\n');
+    });
+    showToast('重复行已去除');
+}
+
+function sortLines() {
+    process(lines => [...lines].sort((a, b) => a.localeCompare(b, 'zh')).join('\n'));
+}
+
+function reverseLines() {
+    process(lines => [...lines].reverse().join('\n'));
+}
+
+// Replace modal
+function openReplaceModal() {
+    document.getElementById('replaceModal').classList.add('open');
+}
+
+function closeModal() {
+    document.getElementById('replaceModal').classList.remove('open');
+}
+
+function doReplace() {
+    let text = inputBox.value;
+    const find = document.getElementById('findText').value;
+    const replace = document.getElementById('replaceText').value;
+    const prefix = document.getElementById('addPrefix').value;
+    const suffix = document.getElementById('addSuffix').value;
+
+    if (find) {
+        try {
+            const re = new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+            text = text.replace(re, replace);
+        } catch(e) { showToast('替换失败'); return; }
+    }
+
+    if (prefix || suffix) {
+        text = text.split('\n').map(l => prefix + l + suffix).join('\n');
+    }
+
+    outputBox.value = text;
+    updateCount();
+    closeModal();
+    showToast('替换完成');
+}
+
+document.getElementById('replaceModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('replaceModal')) closeModal();
+});
+
+// Init
+loadCache();
+updateCount();
+</script>
+</body>
+</html>
