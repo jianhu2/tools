@@ -1,0 +1,10 @@
+services:
+  watermark-service:
+    build: .
+    container_name: watermark-service
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      MAX_UPLOAD_MB: "50"
+      WATERMARK_FONT_PATH: /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
