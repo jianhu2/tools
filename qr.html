@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二维码工具 - 在线生成与识别</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▦</text></svg>">
+    <script src="/vendor/qrcode.min.js"></script>
+    <script src="/vendor/jsQR.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5; color: #333; min-height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 90px; min-height: 100vh; background: #fff; border-right: 1px solid #e8e8e8;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+        .sidebar-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; color: #666; font-size: 11px; margin-bottom: 4px;
+            transition: all .2s; text-align: center; line-height: 1.3;
+        }
+        .sidebar-item:hover { background: #f5f5f5; color: #333; }
+        .sidebar-item.active { background: #e8f4f0; color: #1a9a6c; }
+        .sidebar-icon {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px; margin-bottom: 4px; background: #f0f2f5;
+        }
+        .sidebar-item.active .sidebar-icon { background: #1a9a6c; color: #fff; }
+        .sidebar-divider { width: 60px; height: 1px; background: #eee; margin: 8px 0; }
+        .sidebar-more { margin-top: auto; }
+        .main-wrap { margin-left: 90px; flex: 1; padding: 20px; max-width: 1100px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+        .page-desc { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.6; }
+        .tool-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+        .mode-switch {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;
+            background: #fff; border-radius: 10px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .mode-btn {
+            border: 1.5px solid #e4e8eb; background: #f8fafb; color: #555; border-radius: 8px;
+            padding: 14px 12px; cursor: pointer; text-align: left; font-family: inherit;
+            transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+        }
+        .mode-btn:hover { border-color: #1a9a6c; background: #f6fffb; color: #1a9a6c; }
+        .mode-btn.active {
+            border-color: #1a9a6c; background: #e8f4f0; color: #0f7d55; box-shadow: inset 0 0 0 1px rgba(26,154,108,.16);
+        }
+        .mode-btn-title { display: block; font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+        .mode-btn-desc { display: block; font-size: 12px; line-height: 1.5; color: #777; }
+        .mode-btn.active .mode-btn-desc { color: #3c8069; }
+        .mode-panel { display: none; }
+        .mode-panel.active { display: block; }
+        .card {
+            background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px;
+        }
+        .card-title { font-size: 15px; font-weight: 700; color: #333; }
+        .card-subtitle { font-size: 12px; color: #999; line-height: 1.6; margin-top: 4px; }
+        .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+        .field { min-width: 0; }
+        .field-label { display: block; font-size: 12px; color: #777; margin-bottom: 6px; font-weight: 600; }
+        textarea, input, select {
+            width: 100%; border: 1.5px solid #ddd; border-radius: 8px; padding: 10px 12px;
+            font-size: 13px; font-family: inherit; color: #333; outline: none; background: #fafafa;
+            transition: border-color .2s, background .2s;
+        }
+        textarea { min-height: 150px; resize: vertical; line-height: 1.7; font-family: 'Courier New', monospace; }
+        textarea:focus, input:focus, select:focus { border-color: #1a9a6c; background: #fff; }
+        .input-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+        .btn {
+            border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: background .15s, color .15s, border-color .15s; font-family: inherit;
+            white-space: nowrap;
+        }
+        .btn-primary { background: #1a9a6c; color: #fff; }
+        .btn-primary:hover { background: #148a5e; }
+        .btn-secondary { background: #f0f2f5; color: #555; }
+        .btn-secondary:hover { background: #e0e4e7; }
+        .btn-danger { background: #fff0f0; color: #d9363e; border: 1px solid #ffd6d6; }
+        .btn-danger:hover { background: #ffe3e3; }
+        .qr-output {
+            min-height: 320px; display: flex; align-items: center; justify-content: center;
+            border: 1.5px dashed #dbe3e7; border-radius: 10px; background: #fbfcfc; padding: 18px;
+        }
+        .qr-placeholder { color: #aaa; font-size: 13px; text-align: center; line-height: 1.7; }
+        #qrcode { width: 280px; height: 280px; display: flex; align-items: center; justify-content: center; }
+        #qrcode canvas, #qrcode img { max-width: 100%; height: auto; border-radius: 4px; }
+        .drop-zone {
+            border: 1.5px dashed #cfd8dc; border-radius: 10px; background: #fbfcfc; min-height: 180px;
+            display: flex; align-items: center; justify-content: center; padding: 18px; text-align: center;
+            transition: border-color .2s, background .2s; cursor: pointer;
+        }
+        .drop-zone.dragover { border-color: #1a9a6c; background: #f0faf6; }
+        .drop-zone.paste-ready {
+            border-color: #1a9a6c; background: #f0faf6; box-shadow: 0 0 0 3px rgba(26,154,108,.08);
+        }
+        .drop-title { font-size: 14px; font-weight: 700; color: #444; margin-bottom: 6px; }
+        .drop-desc { font-size: 12px; color: #888; line-height: 1.7; }
+        .scan-result {
+            min-height: 110px; border: 1.5px solid #e0e6e8; border-radius: 8px; padding: 12px;
+            font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.7; background: #fafafa;
+            white-space: pre-wrap; word-break: break-all;
+        }
+        .scan-result.empty { color: #aaa; font-family: inherit; }
+        .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 580px; overflow: auto; padding-right: 2px; }
+        .history-empty { font-size: 13px; color: #aaa; line-height: 1.7; padding: 10px 0; }
+        .history-item {
+            border: 1px solid #e8ecef; border-radius: 8px; padding: 10px; background: #fbfcfc;
+            cursor: pointer; transition: border-color .15s, background .15s;
+        }
+        .history-item:hover { border-color: #1a9a6c; background: #f6fffb; }
+        .history-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #999; margin-bottom: 6px; }
+        .history-type { color: #1a9a6c; font-weight: 700; }
+        .history-text {
+            font-family: 'Courier New', monospace; font-size: 12px; color: #333; line-height: 1.5;
+            word-break: break-all; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .tip-line { font-size: 12px; color: #999; line-height: 1.7; margin-top: 10px; }
+        .preview-img { max-width: 100%; max-height: 220px; border-radius: 8px; display: none; margin-top: 12px; border: 1px solid #eee; }
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: rgba(0,0,0,.8); color: white; padding: 10px 22px; border-radius: 20px;
+            font-size: 13px; font-weight: 500; z-index: 9999; pointer-events: none;
+            transition: transform .3s ease; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        @media (max-width: 900px) {
+            .tool-layout { grid-template-columns: 1fr; }
+            .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 600px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .mode-switch { grid-template-columns: 1fr; }
+            .mode-btn { padding: 12px; }
+            .card { padding: 16px; }
+            .form-grid { grid-template-columns: 1fr 1fr; }
+            #qrcode { width: 240px; height: 240px; }
+            .btn { padding: 9px 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <a class="sidebar-item" href="/" title="2FA工具">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+    <a class="sidebar-item active" href="/qr.html" title="二维码工具">
+        <div class="sidebar-icon">▦</div>
+        二维码
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item" href="/note.html" title="文本处理">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+    <a class="sidebar-item" href="/work.html" title="图片处理">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+    <a class="sidebar-item" href="/money.html" title="汇率换算">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-more">
+        <a class="sidebar-item" href="/more.html" title="更多工具">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<div class="main-wrap">
+    <div class="page-title">二维码工具</div>
+    <div class="page-desc">生成和识别都在浏览器本地完成，图片不会上传服务器；历史记录保存在当前浏览器。</div>
+
+    <div class="tool-layout">
+        <div>
+            <div class="mode-switch" role="tablist" aria-label="二维码工具模式">
+                <button class="mode-btn active" id="generateModeBtn" type="button" role="tab" aria-selected="true" aria-controls="generatePanel" onclick="switchMode('generate')">
+                    <span class="mode-btn-title">生成二维码</span>
+                    <span class="mode-btn-desc">输入文本或链接，生成并下载 PNG</span>
+                </button>
+                <button class="mode-btn" id="scanModeBtn" type="button" role="tab" aria-selected="false" aria-controls="scanPanel" onclick="switchMode('scan')">
+                    <span class="mode-btn-title">识别二维码</span>
+                    <span class="mode-btn-desc">上传、拖拽或粘贴截图解析内容</span>
+                </button>
+            </div>
+
+            <div class="card mode-panel active" id="generatePanel" role="tabpanel" aria-labelledby="generateModeBtn">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">生成二维码</div>
+                        <div class="card-subtitle">输入文本、链接、配置字符串或任意内容后生成二维码。</div>
+                    </div>
+                </div>
+                <textarea id="qrText" placeholder="输入需要生成二维码的内容，例如：https://tools.jianhu.cc"></textarea>
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="field-label" for="qrSize">尺寸</label>
+                        <select id="qrSize">
+                            <option value="220">220 px</option>
+                            <option value="280" selected>280 px</option>
+                            <option value="360">360 px</option>
+                            <option value="480">480 px</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="qrLevel">纠错等级</label>
+                        <select id="qrLevel">
+                            <option value="L">L 低</option>
+                            <option value="M" selected>M 中</option>
+                            <option value="Q">Q 较高</option>
+                            <option value="H">H 最高</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="darkColor">前景色</label>
+                        <input id="darkColor" type="color" value="#111111">
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="lightColor">背景色</label>
+                        <input id="lightColor" type="color" value="#ffffff">
+                    </div>
+                </div>
+                <div class="input-row">
+                    <button class="btn btn-primary" onclick="generateQR()">生成二维码</button>
+                    <button class="btn btn-secondary" onclick="downloadQR()">下载 PNG</button>
+                    <button class="btn btn-secondary" onclick="useExample()">示例</button>
+                    <button class="btn btn-secondary" onclick="clearGenerator()">清空</button>
+                </div>
+                <div class="tip-line">生成记录会自动加入右侧历史，点击历史项可再次填入并生成。</div>
+                <div id="qrOutput" class="qr-output">
+                    <div class="qr-placeholder">生成后的二维码会显示在这里</div>
+                </div>
+            </div>
+
+            <div class="card mode-panel" id="scanPanel" role="tabpanel" aria-labelledby="scanModeBtn">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">识别二维码</div>
+                        <div class="card-subtitle">支持上传、拖拽和直接粘贴截图；当前版本识别图片中的单个二维码。</div>
+                    </div>
+                </div>
+                <input id="fileInput" type="file" accept="image/*" style="display:none" onchange="handleFiles(this.files)">
+                <div class="drop-zone" id="dropZone" tabindex="0" onclick="activatePasteMode()">
+                    <div>
+                        <div class="drop-title" id="dropTitle">点击这里后按 Ctrl+V 粘贴截图</div>
+                        <div class="drop-desc" id="dropDesc">也可以拖拽图片到此处，或用下方按钮选择图片、读取剪贴板。</div>
+                    </div>
+                </div>
+                <img id="previewImg" class="preview-img" alt="二维码图片预览">
+                <div class="input-row">
+                    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">选择图片</button>
+                    <button class="btn btn-secondary" onclick="pasteFromClipboard()">粘贴截图识别</button>
+                    <button class="btn btn-secondary" onclick="copyScanResult()">复制结果</button>
+                    <button class="btn btn-secondary" onclick="sendScanToGenerator()">用结果生成二维码</button>
+                    <button class="btn btn-secondary" onclick="clearScanner()">清空识别</button>
+                </div>
+                <div id="scanResult" class="scan-result empty">识别结果会显示在这里。</div>
+            </div>
+        </div>
+
+        <aside class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">历史记录</div>
+                    <div class="card-subtitle">保存在当前浏览器，最多保留 50 条。</div>
+                </div>
+                <button class="btn btn-danger" onclick="clearHistory()">清空</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+        </aside>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#bbb;padding:10px 0 20px">
+        最近维护：2026年5月 &nbsp;·&nbsp; © 2026 tools.jianhu.cc
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const HISTORY_KEY = 'tools_qr_history_v1';
+const MAX_HISTORY = 50;
+let qrInstance = null;
+let latestGenerated = '';
+let latestScanned = '';
+let pasteModeTimer = null;
+
+function levelValue(level) {
+    return QRCode.CorrectLevel[level] || QRCode.CorrectLevel.M;
+}
+
+function switchMode(mode) {
+    const isScan = mode === 'scan';
+    document.getElementById('generateModeBtn').classList.toggle('active', !isScan);
+    document.getElementById('scanModeBtn').classList.toggle('active', isScan);
+    document.getElementById('generateModeBtn').setAttribute('aria-selected', String(!isScan));
+    document.getElementById('scanModeBtn').setAttribute('aria-selected', String(isScan));
+    document.getElementById('generatePanel').classList.toggle('active', !isScan);
+    document.getElementById('scanPanel').classList.toggle('active', isScan);
+    if (!isScan) {
+        resetPasteMode();
+    }
+}
+
+function generateQR(textOverride) {
+    const textInput = document.getElementById('qrText');
+    const text = (typeof textOverride === 'string' ? textOverride : textInput.value).trim();
+    if (!text) {
+        showToast('请输入要生成的内容');
+        textInput.focus();
+        return;
+    }
+
+    const size = Number(document.getElementById('qrSize').value) || 280;
+    const container = document.getElementById('qrcode');
+    if (container) container.remove();
+
+    const output = document.getElementById('qrOutput');
+    output.innerHTML = '<div id="qrcode"></div>';
+    const qrBox = document.getElementById('qrcode');
+    qrBox.style.width = size + 'px';
+    qrBox.style.height = size + 'px';
+
+    qrInstance = new QRCode(qrBox, {
+        text,
+        width: size,
+        height: size,
+        colorDark: document.getElementById('darkColor').value,
+        colorLight: document.getElementById('lightColor').value,
+        correctLevel: levelValue(document.getElementById('qrLevel').value)
+    });
+
+    latestGenerated = text;
+    textInput.value = text;
+    addHistory('生成', text);
+    showToast('二维码已生成');
+}
+
+function downloadQR() {
+    if (!latestGenerated) {
+        showToast('请先生成二维码');
+        return;
+    }
+    const qrBox = document.getElementById('qrcode');
+    const canvas = qrBox ? qrBox.querySelector('canvas') : null;
+    const img = qrBox ? qrBox.querySelector('img') : null;
+    const link = document.createElement('a');
+    link.download = 'qrcode.png';
+    if (canvas) {
+        link.href = canvas.toDataURL('image/png');
+    } else if (img && img.src) {
+        link.href = img.src;
+    } else {
+        showToast('当前浏览器无法导出');
+        return;
+    }
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+}
+
+function clearGenerator() {
+    document.getElementById('qrText').value = '';
+    document.getElementById('qrOutput').innerHTML = '<div class="qr-placeholder">生成后的二维码会显示在这里</div>';
+    latestGenerated = '';
+}
+
+function useExample() {
+    document.getElementById('qrText').value = 'https://tools.jianhu.cc';
+    generateQR();
+}
+
+async function handleFiles(files) {
+    const file = files && files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        showToast('请选择图片文件');
+        return;
+    }
+    try {
+        const image = await loadImage(file);
+        const result = scanImage(image);
+        const preview = document.getElementById('previewImg');
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        resetPasteMode();
+        setScanResult(result);
+    } catch (err) {
+        setScanResult('');
+        showToast('图片读取失败');
+    }
+}
+
+function activatePasteMode() {
+    const zone = document.getElementById('dropZone');
+    const title = document.getElementById('dropTitle');
+    const desc = document.getElementById('dropDesc');
+    zone.classList.add('paste-ready');
+    zone.focus();
+    title.textContent = '现在按 Ctrl+V 粘贴截图';
+    desc.textContent = '如果图片已经保存成文件，也可以拖到这里或点击“选择图片”。';
+    showToast('按 Ctrl+V 粘贴截图');
+    clearTimeout(pasteModeTimer);
+    pasteModeTimer = setTimeout(resetPasteMode, 8000);
+}
+
+function resetPasteMode() {
+    const zone = document.getElementById('dropZone');
+    const title = document.getElementById('dropTitle');
+    const desc = document.getElementById('dropDesc');
+    zone.classList.remove('paste-ready');
+    title.textContent = '点击这里后按 Ctrl+V 粘贴截图';
+    desc.textContent = '也可以拖拽图片到此处，或用下方按钮选择图片、读取剪贴板。';
+    clearTimeout(pasteModeTimer);
+}
+
+async function pasteFromClipboard() {
+    activatePasteMode();
+    if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+        showToast('当前浏览器不支持按钮读取剪贴板，请按 Ctrl+V');
+        return;
+    }
+    try {
+        const items = await navigator.clipboard.read();
+        const files = [];
+        for (const item of items) {
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+                const blob = await item.getType(imageType);
+                files.push(new File([blob], 'clipboard-image.png', { type: imageType }));
+            }
+        }
+        if (files.length) {
+            await handleFiles(files);
+        } else {
+            showToast('剪贴板里没有图片，请复制截图后再试');
+        }
+    } catch (err) {
+        showToast('请按 Ctrl+V 粘贴截图');
+    }
+}
+
+function loadImage(file) {
+    if ('createImageBitmap' in window) {
+        return createImageBitmap(file);
+    }
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+function scanImage(image) {
+    const canvas = document.createElement('canvas');
+    const maxSide = 1600;
+    const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
+    canvas.width = Math.max(1, Math.round(image.width * ratio));
+    canvas.height = Math.max(1, Math.round(image.height * ratio));
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+    return code ? code.data : '';
+}
+
+function setScanResult(text) {
+    const box = document.getElementById('scanResult');
+    if (text) {
+        latestScanned = text;
+        box.textContent = text;
+        box.classList.remove('empty');
+        addHistory('识别', text);
+        showToast('识别成功');
+    } else {
+        latestScanned = '';
+        box.textContent = '未识别到二维码，请尝试裁剪图片或提高图片清晰度。';
+        box.classList.remove('empty');
+    }
+}
+
+function copyScanResult() {
+    if (!latestScanned) {
+        showToast('没有可复制的识别结果');
+        return;
+    }
+    copyText(latestScanned, '识别结果已复制');
+}
+
+function sendScanToGenerator() {
+    if (!latestScanned) {
+        showToast('没有识别结果');
+        return;
+    }
+    switchMode('generate');
+    document.getElementById('qrText').value = latestScanned;
+    generateQR(latestScanned);
+}
+
+function clearScanner() {
+    latestScanned = '';
+    const box = document.getElementById('scanResult');
+    box.textContent = '识别结果会显示在这里。';
+    box.classList.add('empty');
+    const preview = document.getElementById('previewImg');
+    preview.removeAttribute('src');
+    preview.style.display = 'none';
+    document.getElementById('fileInput').value = '';
+    resetPasteMode();
+}
+
+function readHistory() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+function writeHistory(items) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, MAX_HISTORY)));
+}
+
+function addHistory(type, text) {
+    const items = readHistory();
+    const normalized = text.trim();
+    const next = items.filter(item => !(item.type === type && item.text === normalized));
+    next.unshift({ type, text: normalized, time: Date.now() });
+    writeHistory(next);
+    renderHistory();
+}
+
+function clearHistory() {
+    if (!confirm('确认清空二维码历史记录？')) return;
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistory();
+    showToast('历史记录已清空');
+}
+
+function renderHistory() {
+    const list = document.getElementById('historyList');
+    const items = readHistory();
+    if (!items.length) {
+        list.innerHTML = '<div class="history-empty">暂无历史记录。生成或识别二维码后会自动保存在这里。</div>';
+        return;
+    }
+    list.innerHTML = '';
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.tabIndex = 0;
+        div.onclick = () => useHistory(item.text);
+        div.onkeydown = e => {
+            if (e.key === 'Enter') useHistory(item.text);
+        };
+        const date = new Date(item.time || Date.now());
+        div.innerHTML = `
+            <div class="history-meta">
+                <span class="history-type">${escapeHtml(item.type || '记录')}</span>
+                <span>${formatTime(date)}</span>
+            </div>
+            <div class="history-text">${escapeHtml(item.text || '')}</div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function useHistory(text) {
+    switchMode('generate');
+    document.getElementById('qrText').value = text;
+    generateQR(text);
+}
+
+function formatTime(date) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+}
+
+function copyText(text, message) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => showToast(message || '已复制'));
+        return;
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+    showToast(message || '已复制');
+}
+
+function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(window.__qrToastTimer);
+    window.__qrToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+function bindDropZone() {
+    const zone = document.getElementById('dropZone');
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        handleFiles(e.dataTransfer.files);
+    });
+    document.addEventListener('paste', e => {
+        const files = [];
+        for (const item of e.clipboardData.items) {
+            if (item.kind === 'file') files.push(item.getAsFile());
+        }
+        if (files.length) {
+            e.preventDefault();
+            handleFiles(files);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    bindDropZone();
+    renderHistory();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG下载工具 - 在线工具</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◇</text></svg>">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #f0f2f5; color: #333; min-height: 100vh; display: flex;
+        }
+        .sidebar {
+            width: 90px; min-height: 100vh; background: #fff; border-right: 1px solid #e8e8e8;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; box-shadow: 2px 0 8px rgba(0,0,0,.04);
+        }
+        .sidebar-item {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            width: 80px; padding: 10px 4px; border-radius: 10px; cursor: pointer;
+            text-decoration: none; color: #666; font-size: 11px; margin-bottom: 4px;
+            transition: all .2s; text-align: center; line-height: 1.3;
+        }
+        .sidebar-item:hover { background: #f5f5f5; color: #333; }
+        .sidebar-item.active { background: #e8f4f0; color: #1a9a6c; }
+        .sidebar-icon {
+            width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px; margin-bottom: 4px; background: #f0f2f5;
+        }
+        .sidebar-item.active .sidebar-icon { background: #1a9a6c; color: #fff; }
+        .sidebar-divider { width: 60px; height: 1px; background: #eee; margin: 8px 0; }
+        .sidebar-more { margin-top: auto; }
+        .main-wrap { margin-left: 90px; flex: 1; padding: 20px; max-width: 1100px; }
+        .page-title { font-size: 22px; font-weight: 700; color: #222; margin-bottom: 4px; }
+        .page-desc { font-size: 13px; color: #888; margin-bottom: 18px; line-height: 1.6; }
+        .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+        .card {
+            background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .card-title { font-size: 15px; font-weight: 700; color: #333; margin-bottom: 8px; }
+        .card-desc { font-size: 12px; color: #888; line-height: 1.7; margin-bottom: 12px; }
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+        .filename {
+            flex: 1; min-width: 180px; border: 1.5px solid #ddd; border-radius: 8px;
+            padding: 10px 12px; font-size: 13px; outline: none; background: #fafafa;
+        }
+        .filename:focus { border-color: #1a9a6c; background: #fff; }
+        .btn {
+            border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: background .15s, color .15s; font-family: inherit; white-space: nowrap;
+        }
+        .btn-primary { background: #1a9a6c; color: #fff; }
+        .btn-primary:hover { background: #148a5e; }
+        .btn-secondary { background: #f0f2f5; color: #555; }
+        .btn-secondary:hover { background: #e0e4e7; }
+        .btn-danger { background: #fff0f0; color: #d9363e; border: 1px solid #ffd6d6; }
+        .btn-danger:hover { background: #ffe3e3; }
+        textarea {
+            width: 100%; min-height: 460px; border: 1.5px solid #ddd; border-radius: 8px;
+            padding: 12px 14px; font-size: 13px; font-family: 'Courier New', monospace;
+            color: #333; resize: vertical; outline: none; line-height: 1.55; background: #fafafa;
+            transition: border-color .2s, background .2s;
+        }
+        textarea:focus { border-color: #1a9a6c; background: #fff; }
+        .preview-box {
+            min-height: 300px; border: 1.5px dashed #dbe3e7; border-radius: 10px;
+            background:
+                linear-gradient(45deg, #f7f8fa 25%, transparent 25%),
+                linear-gradient(-45deg, #f7f8fa 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #f7f8fa 75%),
+                linear-gradient(-45deg, transparent 75%, #f7f8fa 75%);
+            background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+            display: flex; align-items: center; justify-content: center; padding: 22px; overflow: auto;
+        }
+        .preview-box svg { max-width: 100%; max-height: 260px; }
+        .preview-empty { color: #aaa; font-size: 13px; text-align: center; line-height: 1.7; }
+        .status {
+            border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.6; margin-top: 12px;
+            background: #f7f9fa; color: #777; border: 1px solid #e8ecef;
+        }
+        .status.ok { background: #f0faf6; border-color: #c9eadc; color: #157a55; }
+        .status.bad { background: #fff5f5; border-color: #ffd6d6; color: #d9363e; }
+        .hint-list { list-style: none; margin-top: 12px; }
+        .hint-list li { font-size: 12px; color: #666; line-height: 1.9; padding-left: 14px; position: relative; }
+        .hint-list li::before { content: '•'; position: absolute; left: 0; color: #1a9a6c; }
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+            background: rgba(0,0,0,.8); color: white; padding: 10px 22px; border-radius: 20px;
+            font-size: 13px; font-weight: 500; z-index: 9999; pointer-events: none;
+            transition: transform .3s ease; white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+            textarea { min-height: 360px; }
+        }
+        @media (max-width: 600px) {
+            .sidebar { width: 60px; }
+            .sidebar-item { width: 54px; font-size: 9px; }
+            .sidebar-icon { width: 36px; height: 36px; font-size: 18px; }
+            .main-wrap { margin-left: 60px; padding: 12px; }
+            .card { padding: 16px; }
+            .toolbar { gap: 8px; }
+            .btn { padding: 9px 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <a class="sidebar-item" href="/" title="2FA工具">
+        <div class="sidebar-icon">🔑</div>
+        2FA工具
+    </a>
+    <a class="sidebar-item" href="/qr.html" title="二维码工具">
+        <div class="sidebar-icon">▦</div>
+        二维码
+    </a>
+    <div class="sidebar-divider"></div>
+    <a class="sidebar-item" href="/note.html" title="文本处理">
+        <div class="sidebar-icon">📝</div>
+        文本处理
+    </a>
+    <a class="sidebar-item" href="/work.html" title="图片处理">
+        <div class="sidebar-icon">🖼️</div>
+        图片处理
+    </a>
+    <a class="sidebar-item" href="/money.html" title="汇率换算">
+        <div class="sidebar-icon">💱</div>
+        汇率换算
+    </a>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-more">
+        <a class="sidebar-item" href="/more.html" title="更多工具">
+            <div class="sidebar-icon">⋯</div>
+            更多工具
+        </a>
+    </div>
+</nav>
+
+<div class="main-wrap">
+    <div class="page-title">SVG下载工具</div>
+    <div class="page-desc">粘贴从 Figma、浏览器或编辑器复制的 SVG 源码，在浏览器本地预览并下载为 .svg 文件，不上传也不保存到服务器。</div>
+
+    <div class="layout">
+        <div class="card">
+            <div class="card-title">SVG 源码</div>
+            <div class="card-desc">内容必须以完整的 &lt;svg ...&gt; 开始，并包含闭合的 &lt;/svg&gt;。</div>
+            <div class="toolbar">
+                <input class="filename" id="filenameInput" value="icon.svg" autocomplete="off" spellcheck="false" aria-label="文件名">
+                <button class="btn btn-primary" onclick="downloadSvg()">下载 SVG</button>
+                <button class="btn btn-secondary" onclick="copySvg()">复制源码</button>
+                <button class="btn btn-secondary" onclick="loadSample()">加载示例</button>
+                <button class="btn btn-danger" onclick="clearSvg()">清空</button>
+            </div>
+            <textarea id="svgInput" placeholder="在这里粘贴 SVG 源码"></textarea>
+        </div>
+
+        <aside class="card">
+            <div class="card-title">预览</div>
+            <div id="previewBox" class="preview-box">
+                <div class="preview-empty">粘贴 SVG 后会在这里预览</div>
+            </div>
+            <div id="statusBox" class="status">等待输入 SVG 源码。</div>
+            <ul class="hint-list">
+                <li>下载通过浏览器 Blob 完成，服务器不会保存你的 SVG。</li>
+                <li>会自动补充 XML 声明和 SVG 命名空间。</li>
+                <li>为安全起见，预览和下载会移除 script、foreignObject 和内联事件属性。</li>
+            </ul>
+        </aside>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:#bbb;padding:10px 0 20px">
+        最近维护：2026年5月 &nbsp;·&nbsp; © 2026 tools.jianhu.cc
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const sampleSvg = `<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 0.5H88C94.3513 0.5 99.5 5.64873 99.5 12V88C99.5 94.3513 94.3513 99.5 88 99.5H12C5.64873 99.5 0.5 94.3513 0.5 88V12C0.5 5.64873 5.64873 0.5 12 0.5Z" fill="#F7F9FF"/>
+<path d="M12 0.5H88C94.3513 0.5 99.5 5.64873 99.5 12V88C99.5 94.3513 94.3513 99.5 88 99.5H12C5.64873 99.5 0.5 94.3513 0.5 88V12C0.5 5.64873 5.64873 0.5 12 0.5Z" stroke="#C1BCBC"/>
+<path d="M33.0364 46.6115C32.2603 44.4635 31.8722 43.3895 32.0377 42.7013C32.2187 41.9485 32.754 41.3617 33.4383 41.1659C34.0639 40.9869 35.0371 41.4195 36.9835 42.2845C38.7051 43.0497 39.5659 43.4323 40.3746 43.411C41.2651 43.3876 42.1218 43.0305 42.8032 42.3986C43.4221 41.8247 43.8372 40.9103 44.6675 39.0813L46.4972 35.0505C48.0256 31.6835 48.7898 30 50 30C51.2102 30 51.9744 31.6835 53.5028 35.0505L55.3325 39.0813C56.1628 40.9103 56.5779 41.8247 57.1968 42.3986C57.8782 43.0305 58.7349 43.3876 59.6254 43.411C60.4341 43.4323 61.2949 43.0497 63.0165 42.2845C64.9629 41.4195 65.9361 40.9869 66.5617 41.1659C67.246 41.3617 67.7813 41.9485 67.9623 42.7013C68.1278 43.3895 67.7397 44.4635 66.9636 46.6115L63.6276 55.8443C62.2005 59.7939 61.4869 61.7687 59.9937 62.8844C58.5005 64 56.5708 64 52.7115 64H47.2885C43.4292 64 41.4995 64 40.0063 62.8844C38.5131 61.7687 37.7995 59.7939 36.3724 55.8444L33.0364 46.6115Z" stroke="#141B34" stroke-width="3"/>
+<path d="M50 54H50.018" stroke="#141B34" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M40 70H60" stroke="#141B34" stroke-width="3" stroke-linecap="round"/>
+</svg>`;
+
+function parseSvg(raw) {
+    const text = raw.trim();
+    if (!text) return { ok: false, message: '等待输入 SVG 源码。', svg: '' };
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'image/svg+xml');
+    const parseError = doc.querySelector('parsererror');
+    const svg = doc.documentElement;
+    if (parseError || !svg || svg.tagName.toLowerCase() !== 'svg') {
+        return { ok: false, message: '不是有效的 SVG：请确认内容以 <svg> 开始，并包含正确闭合标签。', svg: '' };
+    }
+    sanitize(svg);
+    if (!svg.getAttribute('xmlns')) {
+        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    }
+    const serialized = new XMLSerializer().serializeToString(svg);
+    return {
+        ok: true,
+        message: describeSvg(svg),
+        svg: serialized
+    };
+}
+
+function sanitize(root) {
+    root.querySelectorAll('script, foreignObject, iframe, object, embed').forEach(node => node.remove());
+    root.querySelectorAll('*').forEach(node => {
+        [...node.attributes].forEach(attr => {
+            const name = attr.name.toLowerCase();
+            const value = attr.value.trim().toLowerCase();
+            if (name.startsWith('on') || value.startsWith('javascript:')) {
+                node.removeAttribute(attr.name);
+            }
+        });
+    });
+}
+
+function describeSvg(svg) {
+    const width = svg.getAttribute('width') || 'auto';
+    const height = svg.getAttribute('height') || 'auto';
+    const viewBox = svg.getAttribute('viewBox') || '未设置';
+    return `SVG 校验通过。width=${width}，height=${height}，viewBox=${viewBox}`;
+}
+
+function updatePreview() {
+    const result = parseSvg(document.getElementById('svgInput').value);
+    const preview = document.getElementById('previewBox');
+    const status = document.getElementById('statusBox');
+    status.textContent = result.message;
+    status.className = 'status ' + (result.ok ? 'ok' : (document.getElementById('svgInput').value.trim() ? 'bad' : ''));
+    if (result.ok) {
+        preview.innerHTML = result.svg;
+    } else {
+        preview.innerHTML = '<div class="preview-empty">粘贴 SVG 后会在这里预览</div>';
+    }
+    return result;
+}
+
+function normalizeFilename(name) {
+    let file = name.trim().replace(/[\\/:*?"<>|]+/g, '-');
+    if (!file) file = 'icon.svg';
+    if (!file.toLowerCase().endsWith('.svg')) file += '.svg';
+    return file;
+}
+
+function downloadSvg() {
+    const result = updatePreview();
+    if (!result.ok) {
+        showToast('请先粘贴有效 SVG');
+        return;
+    }
+    const content = '<?xml version="1.0" encoding="UTF-8"?>\n' + result.svg + '\n';
+    const blob = new Blob([content], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = normalizeFilename(document.getElementById('filenameInput').value);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast('SVG 下载已开始');
+}
+
+function copySvg() {
+    const result = updatePreview();
+    if (!result.ok) {
+        showToast('没有可复制的有效 SVG');
+        return;
+    }
+    copyText(result.svg);
+}
+
+function loadSample() {
+    document.getElementById('filenameInput').value = 'figma-icon.svg';
+    document.getElementById('svgInput').value = sampleSvg;
+    updatePreview();
+    showToast('示例已加载');
+}
+
+function clearSvg() {
+    document.getElementById('svgInput').value = '';
+    updatePreview();
+}
+
+function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => showToast('SVG 源码已复制'));
+        return;
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+    showToast('SVG 源码已复制');
+}
+
+function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(window.__svgToastTimer);
+    window.__svgToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+document.getElementById('svgInput').addEventListener('input', updatePreview);
+document.getElementById('filenameInput').addEventListener('blur', e => {
+    e.target.value = normalizeFilename(e.target.value);
+});
+</script>
+</body>
+</html>
