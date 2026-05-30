@@ -1,10 +1,47 @@
 const logger = require('../utils/logger')
 const { use_graph_api, use_get_graph_emails, use_imap_api, generateAuthString, use_get_imap_emails, process_mails, use_test_proxy, use_delete_graph_emails } = require('../services/MailService')
 
+async function tryGraphApi(refresh_token, client_id, mailbox, email, socks5, http) {
+  try {
+    return await use_graph_api(refresh_token, client_id, mailbox, email, socks5, http)
+  } catch (err) {
+    logger.warn(`Graph API unavailable for ${email}, falling back to IMAP: ${err.message}`)
+    return {
+      status: false,
+      new_refresh_token: null,
+      error: err,
+    }
+  }
+}
+
+async function fetchViaImap(refresh_token, client_id, email, mailbox, socks5, http, top) {
+  const imap_api_result = await use_imap_api(refresh_token, client_id, email, socks5, http)
+  const authString = generateAuthString(email, imap_api_result.access_token)
+  let imap_emails
+  const maxAttempts = 3
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      imap_emails = await use_get_imap_emails(email, authString, mailbox, top, socks5, http)
+      break
+    } catch (err) {
+      if (attempt === maxAttempts) throw err
+
+      logger.warn(`IMAP fetch retry ${attempt}/${maxAttempts - 1} for ${email}: ${err.message}`)
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+    }
+  }
+
+  return {
+    emails: imap_emails.sort((a,b)=>new Date(b.date)-new Date(a.date)),
+    new_refresh_token: imap_api_result.new_refresh_token || null,
+  }
+}
+
 const service = {
   async mail_all(refresh_token, client_id, email, mailbox, socks5, http) {
     try {
-      const graph_api_result = await use_graph_api(refresh_token, client_id, mailbox, email, socks5, http)
+      const graph_api_result = await tryGraphApi(refresh_token, client_id, mailbox, email, socks5, http)
       const new_refresh_token = graph_api_result.new_refresh_token
 
       if (graph_api_result.status) {
@@ -12,13 +49,10 @@ const service = {
         return { emails: graph_emails.sort((a,b)=>new Date(b.date)-new Date(a.date)), new_refresh_token }
       }
 
-      // Use new_refresh_token if available (avoid consuming the already-used token again)
       const token_for_imap = new_refresh_token || refresh_token
-      const imap_api_result = await use_imap_api(token_for_imap, client_id, email, socks5, http)
-      const authString = generateAuthString(email, imap_api_result.access_token)
-      const imap_emails = await use_get_imap_emails(email, authString, mailbox, undefined, socks5, http)
+      const imap_result = await fetchViaImap(token_for_imap, client_id, email, mailbox, socks5, http, undefined)
 
-      return { emails: imap_emails.sort((a,b)=>new Date(b.date)-new Date(a.date)), new_refresh_token: imap_api_result.new_refresh_token || new_refresh_token }
+      return { emails: imap_result.emails, new_refresh_token: imap_result.new_refresh_token || new_refresh_token }
     } catch (err) {
       logger.error('Service error when mail_all', err)
       throw new Error('Failed to retrieve mail_all')
@@ -27,7 +61,7 @@ const service = {
 
   async mail_new(refresh_token, client_id, email, mailbox, socks5, http) {
     try {
-      const graph_api_result = await use_graph_api(refresh_token, client_id, mailbox, email, socks5, http)
+      const graph_api_result = await tryGraphApi(refresh_token, client_id, mailbox, email, socks5, http)
       const new_refresh_token = graph_api_result.new_refresh_token
 
       if (graph_api_result.status) {
@@ -36,11 +70,9 @@ const service = {
       }
 
       const token_for_imap = new_refresh_token || refresh_token
-      const imap_api_result = await use_imap_api(token_for_imap, client_id, email, socks5, http)
-      const authString = generateAuthString(email, imap_api_result.access_token)
-      const imap_emails = await use_get_imap_emails(email, authString, mailbox, 1, socks5, http)
+      const imap_result = await fetchViaImap(token_for_imap, client_id, email, mailbox, socks5, http, 1)
 
-      return { emails: imap_emails.sort((a,b)=>new Date(b.date)-new Date(a.date)), new_refresh_token: imap_api_result.new_refresh_token || new_refresh_token }
+      return { emails: imap_result.emails, new_refresh_token: imap_result.new_refresh_token || new_refresh_token }
     } catch (err) {
       logger.error('Service error when mail_new', err)
       throw new Error('Failed to retrieve mail_new')
@@ -49,7 +81,7 @@ const service = {
 
   async process_mailbox(refresh_token, client_id, email, mailbox, socks5, http) {
     try {
-      const graph_api_result = await use_graph_api(refresh_token, client_id, mailbox, email, socks5, http)
+      const graph_api_result = await tryGraphApi(refresh_token, client_id, mailbox, email, socks5, http)
       const new_refresh_token = graph_api_result.new_refresh_token
 
       if (graph_api_result.status) {

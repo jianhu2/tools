@@ -3,20 +3,106 @@ const simpleParser = require("mailparser").simpleParser;
 const { setRedisKey, getRedisKey } = require('./RedisService');
 const { autoAgent } = require('./ProxyService');
 
+const GRAPH_MAILBOX_MAP = {
+    INBOX: 'inbox',
+    Junk: 'junkemail',
+    JunkEmail: 'junkemail',
+    Spam: 'junkemail',
+    DeletedItems: 'deleteditems',
+    Trash: 'deleteditems',
+}
+
+const IMAP_MAILBOX_ALIASES = {
+    INBOX: ['INBOX'],
+    Junk: ['Junk Email', 'Junk', 'Spam', 'Bulk Mail', 'Junk E-mail', '垃圾邮件', '垃圾邮件箱'],
+    JunkEmail: ['Junk Email', 'Junk', 'Spam', 'Bulk Mail', 'Junk E-mail', '垃圾邮件', '垃圾邮件箱'],
+    Spam: ['Junk Email', 'Junk', 'Spam', 'Bulk Mail', 'Junk E-mail', '垃圾邮件', '垃圾邮件箱'],
+    DeletedItems: ['Deleted Items', 'Deleted Messages', 'Trash', 'Deleted', '已删除邮件', '垃圾箱'],
+    Trash: ['Deleted Items', 'Deleted Messages', 'Trash', 'Deleted', '已删除邮件', '垃圾箱'],
+}
+
+const IMAP_SPECIAL_USE = {
+    INBOX: ['\\inbox'],
+    Junk: ['\\junk'],
+    JunkEmail: ['\\junk'],
+    Spam: ['\\junk'],
+    DeletedItems: ['\\trash'],
+    Trash: ['\\trash'],
+}
+
+const normalizeMailbox = (mailbox = 'INBOX') => {
+    const value = String(mailbox || 'INBOX').trim()
+    const lowerValue = value.toLowerCase()
+
+    if (GRAPH_MAILBOX_MAP[value]) return value
+    if (['inbox', '收件箱'].includes(lowerValue)) return 'INBOX'
+    if (['junk', 'junkemail', 'junk email', 'spam', 'bulk mail', '垃圾邮件', '垃圾邮件箱'].includes(lowerValue)) return 'Junk'
+    if (['deleteditems', 'deleted items', 'trash', 'deleted', '已删除邮件', '垃圾箱'].includes(lowerValue)) return 'DeletedItems'
+
+    return 'INBOX'
+}
+
+const resolveGraphMailbox = (mailbox) => GRAPH_MAILBOX_MAP[normalizeMailbox(mailbox)]
+
+const collectImapBoxes = (boxes, prefix = '') => {
+    const flattened = []
+
+    Object.keys(boxes || {}).forEach((name) => {
+        const box = boxes[name]
+        const delimiter = box && box.delimiter ? box.delimiter : '/'
+        const path = prefix ? `${prefix}${delimiter}${name}` : name
+
+        flattened.push({
+            path,
+            attribs: (box && box.attribs) || [],
+        })
+
+        if (box && box.children) {
+            flattened.push(...collectImapBoxes(box.children, path))
+        }
+    })
+
+    return flattened
+}
+
+const getImapBoxes = (imap) => {
+    return new Promise((resolve, reject) => {
+        imap.getBoxes((err, boxes) => {
+            if (err) return reject(err)
+            resolve(collectImapBoxes(boxes))
+        })
+    })
+}
+
+const findImapMailbox = (mailboxes, mailbox) => {
+    const normalized = normalizeMailbox(mailbox)
+    const specialUses = IMAP_SPECIAL_USE[normalized] || []
+    const aliases = IMAP_MAILBOX_ALIASES[normalized] || [normalized]
+    const lowerAliases = aliases.map((item) => item.toLowerCase())
+
+    const specialMatch = mailboxes.find((box) => {
+        return box.attribs.some((attr) => specialUses.includes(String(attr).toLowerCase()))
+    })
+    if (specialMatch) return specialMatch.path
+
+    const exactMatch = mailboxes.find((box) => {
+        return lowerAliases.includes(box.path.toLowerCase())
+    })
+    if (exactMatch) return exactMatch.path
+
+    const basenameMatch = mailboxes.find((box) => {
+        const parts = box.path.split(/[/.]/)
+        const basename = parts[parts.length - 1].toLowerCase()
+        return lowerAliases.includes(basename)
+    })
+    if (basenameMatch) return basenameMatch.path
+
+    return aliases[0]
+}
+
 const use_graph_api = async (refresh_token, client_id, mailbox, email, socks5, http) => {
 
-    let temp_mailbox = mailbox
-    if (mailbox != "INBOX" && mailbox != "Junk") {
-        temp_mailbox = "inbox";
-    }
-
-    if (mailbox == 'INBOX') {
-        temp_mailbox = 'inbox';
-    }
-
-    if (mailbox == 'Junk') {
-        temp_mailbox = 'junkemail';
-    }
+    const temp_mailbox = resolveGraphMailbox(mailbox)
 
     const redis_name = 'graph_api_result_' + email + '_access_token'
     const redis_result = await getRedisKey(redis_name)
@@ -174,6 +260,8 @@ const use_get_imap_emails = (email, authString, mailbox = "INBOX", top = 10000, 
             host: 'outlook.office365.com',
             port: 993,
             tls: true,
+            authTimeout: 30000,
+            connTimeout: 20000,
             tlsOptions: {
                 rejectUnauthorized: false
             }
@@ -184,9 +272,12 @@ const use_get_imap_emails = (email, authString, mailbox = "INBOX", top = 10000, 
 
         imap.once("ready", async () => {
             try {
-                // 动态打开指定的邮箱（如 INBOX 或 Junk）
+                const mailboxes = await getImapBoxes(imap);
+                const resolvedMailbox = findImapMailbox(mailboxes, mailbox);
+
+                // 动态打开指定的邮箱（如 INBOX 或 Junk Email）
                 await new Promise((resolve, reject) => {
-                    imap.openBox(mailbox, true, (err, box) => {
+                    imap.openBox(resolvedMailbox, true, (err, box) => {
                         if (err) return reject(err);
                         resolve(box);
                     });
@@ -275,6 +366,8 @@ const process_mails = (email, authString, mailbox = "INBOX", socks5, http) => {
         host: 'outlook.office365.com',
         port: 993,
         tls: true,
+        authTimeout: 30000,
+        connTimeout: 20000,
         tlsOptions: {
             rejectUnauthorized: false
         }
@@ -327,6 +420,9 @@ const process_mails = (email, authString, mailbox = "INBOX", socks5, http) => {
 
     imap.once('ready', async () => {
         try {
+            const mailboxes = await getImapBoxes(imap);
+            mailbox = findImapMailbox(mailboxes, mailbox);
+
             await openInbox();
             await openInboxFolder();
 

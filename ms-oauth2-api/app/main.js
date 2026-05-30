@@ -14,6 +14,21 @@ const config = require('./config')
 const logger = require('./utils/logger')
 app.use(require('./middlewares/logger'))
 
+app.use(async (ctx, next) => {
+  await next()
+
+  if (ctx.type && ctx.type.includes('html')) {
+    ctx.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    ctx.set('Pragma', 'no-cache')
+    ctx.set('Expires', '0')
+    return
+  }
+
+  if (ctx.path.startsWith('/assets/')) {
+    ctx.set('Cache-Control', 'public, max-age=31536000, immutable')
+  }
+})
+
 // 错误处理
 const errorHandler = require('./middlewares/error')
 app.use(errorHandler)
@@ -30,7 +45,7 @@ app.use(koaBody({
 // 前端资源文件
 const staticPath = path.join(__dirname, './web/MS_OAuth2API_Next_Web/dist')
 app.use(static(staticPath, {
-  maxage: 365 * 24 * 60 * 60 * 1000,
+  maxage: 0,
   gzip: true,
   index: 'index.html'
 }))
@@ -54,6 +69,9 @@ app.use(async (ctx, next) => {
     const indexPath = path.join(staticPath, 'index.html')
     if (fs.existsSync(indexPath)) {
       ctx.type = 'html'
+      ctx.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+      ctx.set('Pragma', 'no-cache')
+      ctx.set('Expires', '0')
       ctx.body = fs.createReadStream(indexPath)
     } else {
       ctx.status = 404

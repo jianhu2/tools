@@ -9,7 +9,7 @@ const router = createRouter({
       path: '/',
       name: 'index',
       component: LayoutView,
-      redirect: '/home',
+      redirect: '/email',
       children: [
         {
           path: '/home',
