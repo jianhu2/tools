@@ -296,9 +296,21 @@ const tableMailList = computed(() => {
     return filteredMailList.value.slice(start, end)
 })
 
+// 去掉行尾注释（空白后的 # 或 //，或整行注释）。
+// Microsoft 的 client_id / refresh_token 不含 '#'，所以按空白+# 截断是安全的。
+const stripInlineComment = (line: string): string => {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('#') || trimmed.startsWith('//')) return ''
+    return trimmed.replace(/\s+(#|\/\/).*$/, '').trim()
+}
+
+// 把粘贴/文件文本拆成干净的账号行：去注释、去空白行。
+const toCredentialLines = (raw: string): string[] =>
+    raw.split(/\r?\n/).map(stripInlineComment).filter(Boolean)
+
 const splitMailboxLine = (line: string, separator: string): Email => {
     const parts: string[] = []
-    let rest = line.trim()
+    let rest = stripInlineComment(line)
 
     for (let i = 0; i < 3; i++) {
         const idx = rest.indexOf(separator)
@@ -307,7 +319,7 @@ const splitMailboxLine = (line: string, separator: string): Email => {
         rest = rest.slice(idx + separator.length)
     }
 
-    parts.push(rest.trim())
+    parts.push(stripInlineComment(rest))
 
     return {
         email: parts[0] || '',
@@ -356,7 +368,7 @@ const parseFileContent = (file: UploadRawFile) => {
             ElMessage.error('文件内容为空')
             return
         }
-        emailList.value = content.split('\n').map(item => item.trim()).filter(Boolean)
+        emailList.value = toCredentialLines(content)
     }
 
     reader.onerror = () => {
@@ -424,7 +436,7 @@ const handleAdd = () => {
 }
 
 const handlePasteAdd = () => {
-    emailList.value = copyTextarea.value.split('\n').map(item => item.trim()).filter(Boolean)
+    emailList.value = toCredentialLines(copyTextarea.value)
     handleAdd()
 }
 
