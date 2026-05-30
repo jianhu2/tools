@@ -117,22 +117,33 @@ const use_graph_api = async (refresh_token, client_id, mailbox, email, socks5, h
 
     const agentOptions = autoAgent(socks5, http);
 
-    const response = await agentOptions.fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
-        method: 'POST',
-        ...agentOptions.proxy,
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-            'client_id': client_id,
-            'grant_type': 'refresh_token',
-            'refresh_token': refresh_token,
-            'scope': 'https://graph.microsoft.com/Mail.Read offline_access'
-        }).toString()
-    });
+    // 不同批次账号授权的 scope 不一样：多数是 Mail.Read，部分是 Mail.ReadWrite（只接受 .default）。
+    // 先试 Mail.Read（对多数账号行为不变），失败再用 .default 兜底。失败的请求不会轮换 refresh_token。
+    const graph_scopes = [
+        'https://graph.microsoft.com/Mail.Read offline_access',
+        'https://graph.microsoft.com/.default offline_access'
+    ]
+
+    let response, errorText
+    for (const scope of graph_scopes) {
+        response = await agentOptions.fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+            method: 'POST',
+            ...agentOptions.proxy,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                'client_id': client_id,
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+                'scope': scope
+            }).toString()
+        });
+        if (response.ok) break;
+        errorText = await response.text();
+    }
 
     if (!response.ok) {
-        const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`);
     }
 
@@ -214,22 +225,32 @@ const use_imap_api = async (refresh_token, client_id, email, socks5, http) => {
 
     const agentOptions = autoAgent(socks5, http);
 
-    const response = await agentOptions.fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
-        method: 'POST',
-        ...agentOptions.proxy,
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: new URLSearchParams({
-            'client_id': client_id,
-            'grant_type': 'refresh_token',
-            'refresh_token': refresh_token,
-            'scope': 'https://outlook.office.com/IMAP.AccessAsUser.All offline_access'
-        }).toString()
-    });
+    // 同 Graph：先试明确的 IMAP scope，失败再用 .default 兜底。
+    const imap_scopes = [
+        'https://outlook.office.com/IMAP.AccessAsUser.All offline_access',
+        'https://outlook.office.com/.default offline_access'
+    ]
+
+    let response, errorText
+    for (const scope of imap_scopes) {
+        response = await agentOptions.fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+            method: 'POST',
+            ...agentOptions.proxy,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams({
+                'client_id': client_id,
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+                'scope': scope
+            }).toString()
+        });
+        if (response.ok) break;
+        errorText = await response.text();
+    }
 
     if (!response.ok) {
-        const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`);
     }
 
